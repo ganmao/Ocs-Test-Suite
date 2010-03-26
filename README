@@ -1,3 +1,15 @@
+2010-3-26 12:37:02
+--------------------------------------------------------------------------------
+记几个常用的命令：
+git checkout 将文件迁出
+git commit -m 'to change UTF-8' 提交
+git tag -a v0.1 -m 'version o.1' 添加标签
+git status
+git log
+git log --oneline
+git push orgin master 提交到远程服务器
+git remote add origin git://github.com/ganmao/github-services.git
+
 2010-3-26 10:33:03
 --------------------------------------------------------------------------------
 github.com网站不支持中文显示，将文件转为Unicode-8方式看看能否显示正常了
