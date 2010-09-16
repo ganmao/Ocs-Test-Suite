@@ -18,7 +18,12 @@ class AVP(object):
     '''
     
     def __init__(self, avp_code=0, avp_data=None, vendor_id=0, 
-                 mandatory=0, private=0, level=0, decode_buf = None):
+                 mandatory=0, private=0, level=0, decode_buf = None,
+                 avp_config_instance=None):
+        '''
+        avp_config_instance    对应需编码的实例字典（编码时必填）
+        
+        '''
         
         # 可读格式输出模板
         self.print_template = Template("\
@@ -30,6 +35,8 @@ ${L}AVP_DATA=${AVP_DATA}\n\
 ${L}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
         
         self.simple_print_template = Template("${L}${AVP_NAME}(${AVP_CODE}) = [${AVP_DATA}]")
+        
+        self.avp_cfg = avp_config_instance
         
         self.avp                   = {}
         if decode_buf:  # 认定为需要解码
@@ -58,10 +65,9 @@ ${L}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
             self.avp['AVP_BUF']        = None
             self.avp['AVP_CODE_STATE'] = "00"
             
-            if self.avp['AVP_CODE'] == 0 :
+            if (self.avp['AVP_CODE'] == 0):
                 raise D_ERROR.AvpE_InvalidInitParam, \
-                    "初始化参数错误，请检查！\nAVP_CODE=[%s]" \
-                                % repr(self.avp['AVP_CODE'])
+                    "初始化参数错误，请检查！\n\tAVP_CODE=0"
         
         self.avp['AVP_LEVEL']          = level
         self.avp['AVP_CODE_OPERATOR']  = "!i"
@@ -71,6 +77,8 @@ ${L}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
     def __del__(self):
         del self.avp
         del self.print_template
+        del self.simple_print_template
+        del self.avp_cfg 
         
     def __repr__(self):
         if (self.avp['AVP_CODE_STATE'][1:] == "2"):
@@ -80,25 +88,26 @@ ${L}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
         
     def __str__(self):
         return self.__repr__()
-        
-    def _calc_encode_size(self, data_type):
-        '''计算编码后数据所占长度,请根据不同数据类型进行重载'''
-        return calcsize(data_type)
     
     def encode_head(self):
         '''编码AVP包头'''
         self.avp['AVP_LENGTH'] = 4 + 4   # AVP_CODE + AVP_FLAG + AVP_LENGTH的长度
         
+        # 集中设置AVP的各个属性
+#        self.set_avp_data()
+#        self.set_avp_vonder_id()
+#        self.set_avp_mandatory()
+#        self.set_avp_proxy()
+#        self.set_avp_level()
+        
         # 编码AVP_CODE
-        self.avp['AVP_BUF'] = pack("!I", self.avp['AVP_CODE'])
+        avp_head_buf = pack("!I", self.avp['AVP_CODE'])
         
         # 编码AVP_FLAG 和 AVP_LENGTH
-        
         if self.avp['AVP_VENDOR_ID'] != 0:       # 如果含有Vendor_id则长度增加4
             self.avp['AVP_LENGTH'] += 4
-        
-        self.avp['AVP_LENGTH'] += self._calc_encode_size(
-                                            self.avp['AVP_CODE_OPERATOR'])
+
+        self.avp['AVP_LENGTH'] += len(self.avp['AVP_BUF'])
         
         # 确定AVP_FLAG
         # Vendor_id != 0 则需要添加FLAG标志和
@@ -113,14 +122,14 @@ ${L}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
         flag_and_length = ( (self.avp['AVP_FLAG']<<24) \
                             | self.avp['AVP_LENGTH'])
         
-        self.avp['AVP_BUF'] += pack("!I", flag_and_length)
+        avp_head_buf += pack("!I", flag_and_length)
         
         # 编码VENDOR_ID
         if self.avp['AVP_VENDOR_ID'] != 0:
-            self.avp['AVP_BUF'] += pack("!I", self.avp['AVP_VENDOR_ID'])
+            avp_head_buf += pack("!I", self.avp['AVP_VENDOR_ID'])
         
         self.avp['AVP_CODE_STATE'] = "01"
-        return self.avp['AVP_BUF']
+        return avp_head_buf
     
     def encde_data(self):
         '''编码AVP_DATA'''
@@ -132,13 +141,10 @@ ${L}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
             raise D_ERROR.AvpE_InvalidCodeState, \
                     "错误的状态[%s]，请检查实例化的参数是否错误！" % \
                      self.avp['AVP_CODE_STATE']
+                     
+        self.avp['AVP_BUF'] = self.encde_data()
         
-        self.avp['AVP_BUF'] = self.encode_head()
-        self.avp['AVP_BUF'] += self.encde_data()
-        
-        if self.avp['AVP_DATA_TYPE'] == "Grouped":
-            self._reset_avp_length(self.avp['AVP_LENGTH'] \
-                                  + len(self.avp['GROUP_SUB_BUF']))
+        self.avp['AVP_BUF'] = self.encode_head() + self.avp['AVP_BUF']
         
         self.avp['AVP_CODE_STATE'] = "02"
         return self.avp['AVP_BUF']
@@ -200,9 +206,7 @@ ${L}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
         '''解码AVP包体数据
                      返回本次解码AVP包的总长度
         '''
-        
         self._reset_operator_type()
-        #self._reset_avp_length()
         
         (self.avp['AVP_DATA'],) = unpack_from(self.avp['AVP_CODE_OPERATOR'], 
                                                  self.avp['AVP_BUF'], 
@@ -229,47 +233,45 @@ ${L}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
         pass
     
     def _fmt_avp_data(self):
+        '''对于已经解码的数据进行格式化，等待具体类型重载'''
         pass
-    
-    def _reset_avp_length(self, new_length):
-        '''重置AVP_LENGTH，当Grouped加入了新的AVP后需要重置AVP_LENG的长度'''
-        self.avp['AVP_LENGTH'] = new_length
+                    
+    def create_avp_factory(self, sub_avp_data_type):
+        '''根据不同的数据类型创建不同的数据实例'''
+        from avp_integer32 import Integer32
+        from avp_integer64 import Integer64
+        from avp_unsigned32 import Unsigned32
+        from avp_unsigned64 import Unsigned64
+        from avp_octetstring import OctetString
+        from avp_float32 import Float32
+        from avp_float64 import Float64
         
-        if self.avp['AVP_CODE_STATE'] == "01" :
-            (flags_and_length,) = unpack_from("!I",
-                                           self.avp['AVP_BUF'],
-                                           4)
-            
-            flags = flags_and_length >> 24
-            flags_and_length = (flags << 24) | self.avp['AVP_LENGTH']
-            
-#            self.avp['AVP_BUF'] = pack_into("!I",
-#                                               self.avp['AVP_BUF'],
-#                                               4,
-#                                               flags_and_length)
-            self.avp['AVP_BUF'] = self.avp['AVP_BUF'][:4] + \
-                                  pack("!I", flags_and_length) + \
-                                  self.avp['AVP_BUF'][8:]
-
-        else:
-            raise D_ERROR.AvpE_InvalidCodeState, \
-                  "错误的状态[%s]，不能重置AVP_LENGTH" % self.avp['AVP_CODE_STATE']
-    
-        return self.avp['AVP_LENGTH']
-    
-    def _find_avp_data_type(self, avp_code):
-        '''根据传入的AVP_CODE查找到对应的类型
-                      需要加载配置文件后定义
-        '''
-        if avp_code == 123:
-            return "Integer32"
-        elif avp_code == 321:
-            return "Integer64"
-        elif avp_code == 234:
-            return "OctetString"
+        if sub_avp_data_type == "Integer32":
+            sub_avp = Integer32(decode_buf=self.avp['AVP_BUF'],
+                                level=self.avp['AVP_LEVEL'] + 1)
+        elif sub_avp_data_type == "Integer64":
+            sub_avp = Integer64(decode_buf=self.avp['AVP_BUF'],
+                                level=self.avp['AVP_LEVEL'] + 1)
+        elif sub_avp_data_type == "Unsigned32":
+            sub_avp = Unsigned32(decode_buf=self.avp['AVP_BUF'],
+                                 level=self.avp['AVP_LEVEL'] + 1)
+        elif sub_avp_data_type == "Unsigned64":
+            sub_avp = Unsigned64(decode_buf=self.avp['AVP_BUF'],
+                                 level=self.avp['AVP_LEVEL'] + 1)
+        elif sub_avp_data_type == "OctetString":
+            sub_avp = OctetString(decode_buf=self.avp['AVP_BUF'],
+                                  level=self.avp['AVP_LEVEL'] + 1)
+        elif sub_avp_data_type == "Float32":
+            sub_avp = Float32(decode_buf=self.avp['AVP_BUF'],
+                                  level=self.avp['AVP_LEVEL'] + 1)
+        elif sub_avp_data_type == "Float64":
+            sub_avp = Float64(decode_buf=self.avp['AVP_BUF'],
+                                  level=self.avp['AVP_LEVEL'] + 1)
         else:
             raise D_ERROR.AvpE_InvalidAvpDataType, \
-                    "错误的数据类型，暂时还不支持！"
+                  "错误的数据类型，无法解析：[%s]" % sub_avp_data_type
+                
+        return sub_avp
         
     def get_avp_code(self, pack_buf, offset=0):
         (avp_code,) = unpack_from("!I", pack_buf, offset)
@@ -282,6 +284,46 @@ ${L}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
     def get_avp_length(self, pack_buf, offset=4):
         (flags_and_length,) = unpack_from("!I", pack_buf, offset)
         return flags_and_length & 0x00FFFFFF
+    
+    def set_avp_data(self, avp_data):
+        if self.avp['AVP_CODE_STATE'] == "00":
+            self.avp['AVP_DATA'] = avp_data
+        else:
+            raise D_ERROR.AvpE_InvalidCodeState, \
+                    "错误的编码状态[%s]，当前不能设置AVP_DATA！" % \
+                    self.avp['AVP_CODE_STATE']
+    
+    def set_avp_level(self, level):
+        if self.avp['AVP_CODE_STATE'] == "00":
+            self.avp['AVP_LEVEL'] = level
+        else:
+            raise D_ERROR.AvpE_InvalidCodeState, \
+                    "错误的编码状态[%s]，当前不能设置AVP_LEVEL！" % \
+                    self.avp['AVP_CODE_STATE']
+    
+    def set_avp_vonder_id(self, vendor_id):
+        if self.avp['AVP_CODE_STATE'] == "00":
+            self.avp['AVP_VENDOR_ID'] = vendor_id
+        else:
+            raise D_ERROR.AvpE_InvalidCodeState, \
+                    "错误的编码状态[%s]，当前不能设置AVP_VENDOR_ID！" % \
+                    self.avp['AVP_CODE_STATE']
+    
+    def set_avp_mandatory(self, mandatory):
+        if self.avp['AVP_CODE_STATE'] == "00":
+            self.avp['AVP_MANDATORY'] = mandatory
+        else:
+            raise D_ERROR.AvpE_InvalidCodeState, \
+                    "错误的编码状态[%s]，当前不能设置AVP_MANDATORY！" % \
+                    self.avp['AVP_CODE_STATE']
+    
+    def set_avp_private(self, private):
+        if self.avp['AVP_CODE_STATE'] == "00":
+            self.avp['AVP_PRIVATE'] = private
+        else:
+            raise D_ERROR.AvpE_InvalidCodeState, \
+                    "错误的编码状态[%s]，当前不能设置AVP_PRIVATE！" % \
+                    self.avp['AVP_CODE_STATE']
         
     def print_avp(self):
         '''按照规定格式输出数据'''

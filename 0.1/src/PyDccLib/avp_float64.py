@@ -13,9 +13,11 @@ class Float64(AVP):
     该64比特值按网络字节顺序传送。AVP长度字段必须设置为16（如果“V”比特有效，则为20）。
     '''
     def __init__(self, avp_code=0, avp_data=None, vendor_id=0, 
-                 mandatory=0, private=0, level=0, decode_buf = None):
+                 mandatory=0, private=0, level=0, decode_buf=None,
+                 avp_config_instance=None):
         AVP.__init__(self, avp_code, avp_data, vendor_id, 
-                     mandatory, private, level, decode_buf)
+                     mandatory, private, level, decode_buf,
+                     avp_config_instance)
         self.avp['AVP_CODE_OPERATOR']  = "!d"
         self.avp['AVP_DATA_TYPE']      = "Float64"
         

@@ -10,8 +10,11 @@ import PyDccLib
 import binascii
 import pprint
 
-class Test_PyDccLib(unittest.TestCase):
+class Test_PyDccLibCore(unittest.TestCase):
     '''测试Dcc模块'''
+    def setUp(self):
+        self.dcc_cfg = PyDccLib.DCF.DccConfig()
+    
     def test_const_define(self):
         '测试定义的常量'
         self.assertEqual(PyDccLib.ACD.const.AVP_FLAG_VENDOR, 0x80)
@@ -75,34 +78,65 @@ class Test_PyDccLib(unittest.TestCase):
         
     def test_Grouped(self):
         '测试Grouped数据类型'
+        avp_cfg = self.dcc_cfg.CCR
         my_avp_packer_grouped = PyDccLib.Grouped(456)
         
-        my_avp_packer = PyDccLib.Integer32(123, 456, 1, 1)
+        my_avp_packer = PyDccLib.Integer32(278, 456)
         p = my_avp_packer.encode()
         my_avp_packer_grouped.append(p)
         
-        my_avp_packer = PyDccLib.Integer64(321, 8589934591, 4006, 1)
+        my_avp_packer = PyDccLib.Integer64(447, 8589934591, 4006, 1)
         p = my_avp_packer.encode()
         my_avp_packer_grouped.append(p)
         
-        my_avp_packer = PyDccLib.OctetString(234, "abcdefghi", 4006, 1)
+        my_avp_packer = PyDccLib.OctetString(2, "abcdefghi", 10415, 1)
         p = my_avp_packer.encode()
         my_avp_packer_grouped.append(p)
         
         p_grouped = my_avp_packer_grouped.encode()
+        #pprint.pprint(my_avp_packer_grouped.avp)
         #print binascii.b2a_hex(p_grouped)
+        #my_avp_packer_grouped.pa()
         self.assertEqual(binascii.b2a_hex(p_grouped), 
-                         '000001c8000000440000007bc000001000000001000001c800000141c000001400000fa600000001ffffffff000000eac000001800000fa6616263646566676869000000')
+                         '000001c800000040000001160000000c000001c8000001bfc000001400000fa600000001ffffffff00000002c0000018000028af616263646566676869000000')
         
         # 解包
-        my_avp_unpacker_group = PyDccLib.Grouped(decode_buf=p_grouped)
+        my_avp_unpacker_group = PyDccLib.Grouped(decode_buf=p_grouped, avp_config_instance=avp_cfg)
         my_avp_unpacker_group.decode()
         #pprint.pprint(my_avp_unpacker_group.avp)
-        #my_avp_unpacker_group.print_avp()
+        my_avp_unpacker_group.print_avp()
         my_avp_unpacker_group.pa()
+        
+class Test_PyDccLibCfg(unittest.TestCase):
+    '''测试Dcc模块加载配置文件'''
+    def test_cfg(self):
+        '测试配置文件加载'
+        cfg = PyDccLib.DCF.DccConfig()
+        #pprint.pprint(cfg.Cmd2Code)
+        #pprint.pprint(cfg.Code2Cmd)
+        #pprint.pprint(cfg.CCA)
+        #pprint.pprint(cfg.CCR)
+        
+class Test_DccMsg(unittest.TestCase):
+    '''测试DCC消息 包'''
+        
+class Test_Engine(unittest.TestCase):
+    '从引擎开始测试DCC的使用'
+    def test_e(self):
+        '测试引擎初始化'
+        de = PyDccLib.DE()
+        #pprint.pprint(de.dcf.Cmd2Code)
+        #pprint.pprint(de.dcf.Code2Cmd)
 
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']
-    unittest.main()
-    #suite = unittest.TestLoader().loadTestsFromTestCase(Test_PyDccLib)
+    #unittest.main()
+    
+    #suite = unittest.TestLoader().loadTestsFromTestCase(Test_Engine)
+    #unittest.TextTestRunner(verbosity=2).run(suite)
+    
+    suite = unittest.TestLoader().loadTestsFromTestCase(Test_PyDccLibCore)
+    unittest.TextTestRunner(verbosity=2).run(suite)
+    
+    #suite = unittest.TestLoader().loadTestsFromTestCase(Test_PyDccLibCfg)
     #unittest.TextTestRunner(verbosity=2).run(suite)

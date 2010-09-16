@@ -3,7 +3,10 @@
 __doc__ = '''
 用来解包及编码DCC的库
 
-初始化参数说明：
+使用说明：
+～～～～～～～～～～～～～～～～～～～～～～～～～
+AVP初始化参数说明：
+===============================================
     avp_code            AVP编码（编码时必传）
     avp_data            AVP数据（编码时必传）
     vendor_id
@@ -23,15 +26,20 @@ __doc__ = '''
 其他方法说明：
     print_avp()    打印详细的解码或者编码后结果
     pa()            打印简单的解码或编码后结果
+===============================================
 '''
 
-# TODO: 增加读取配置文件模块，根据配置文件进行解包和编码
+# TODO: 增加模块管理引擎，进行管理
+# TODO: 实现具体的消息包编码与解包
 # TODO: 实现其他扩展的数据类型
 
 __version__ = "0.1"
 
 import avp_const_define as ACD
 import avp_error as D_ERROR
+import dcc_config as DCF
+
+from dcc_engine import DiameterEngine as DE
 
 # AVP基类
 from avp import AVP

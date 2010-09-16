@@ -74,3 +74,9 @@ class AvpE_InvalidInitParam(AvpException):
     def __name__(self):
         return "AvpE_InvalidInitParam"
     
+class AvpE_InvalidEtcParam(AvpException):
+    '''配置文件错误'''
+    def __init__(self, msg=None):
+        AvpException.__init__(self, msg)
+    def __name__(self):
+        return "AvpE_InvalidEtcParam"

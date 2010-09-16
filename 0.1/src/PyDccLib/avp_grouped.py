@@ -8,17 +8,11 @@ Created on 2010-9-13
 '''
 from string import Template
 import binascii
+from struct import unpack_from
 
 import avp_error as D_ERROR
 
 from avp import AVP
-from avp_integer32 import Integer32
-from avp_integer64 import Integer64
-from avp_unsigned32 import Unsigned32
-from avp_unsigned64 import Unsigned64
-from avp_octetstring import OctetString
-from avp_float32 import Float32
-from avp_float64 import Float64
 
 class Grouped(AVP):
     '''该数据字段定义为一个AVP序列。这些AVP按其定义的顺序排列，
@@ -26,9 +20,15 @@ class Grouped(AVP):
             加上所有序列内的AVP的长度总和。因此Grouped类型的AVP的AVP长度字段总是4的倍数。
     '''
     def __init__(self, avp_code=0, avp_data=None, vendor_id=0, 
-                 mandatory=0, private=0, level=0, decode_buf = None):
+                 mandatory=0, private=0, level=0, decode_buf=None,
+                 avp_config_instance=None):
         AVP.__init__(self, avp_code, avp_data, vendor_id, 
-                     mandatory, private, level, decode_buf)
+                     mandatory, private, level, decode_buf,
+                     avp_config_instance)
+        
+        if (self.avp_cfg == None and self.avp['AVP_CODE_STATE'] == "10"):
+            raise D_ERROR.AvpE_InvalidInitParam, \
+                    "编码Grouped类型必须传入avp_config_instance！"
         
         self.avp['AVP_DATA_TYPE']    = "Grouped"
         
@@ -51,8 +51,7 @@ ${L}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
     
     def append(self, pack_buf):
         '''Grouped专用来给其添加子AVP'''
-        if self.avp['AVP_CODE_STATE'][:1] == "0" \
-            and self.avp['AVP_CODE_STATE'] != "02":
+        if self.avp['AVP_CODE_STATE'] == "00":
             self.avp['GROUP_SUB_BUF'] += pack_buf
         
     def decode_data(self, offset=0):
@@ -60,34 +59,11 @@ ${L}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
                      每次解码一个AVP,将解码结果存储在self.avp['GROUPED_SUBS_AVP']的字典组成的数据中
                      返回本次解码AVP包的长度
         '''
-        sub_avp_code = self.get_avp_code(self.avp['AVP_BUF'], offset)
+        (sub_avp_code,) = unpack_from("!I", self.avp['AVP_BUF'], offset)
         
         sub_avp_data_type = self._find_avp_data_type(sub_avp_code)
         
-        if sub_avp_data_type == "Integer32":
-            sub_avp = Integer32(decode_buf=self.avp['AVP_BUF'],
-                                level=self.avp['AVP_LEVEL'] + 1)
-        elif sub_avp_data_type == "Integer64":
-            sub_avp = Integer64(decode_buf=self.avp['AVP_BUF'],
-                                level=self.avp['AVP_LEVEL'] + 1)
-        elif sub_avp_data_type == "Unsigned32":
-            sub_avp = Unsigned32(decode_buf=self.avp['AVP_BUF'],
-                                 level=self.avp['AVP_LEVEL'] + 1)
-        elif sub_avp_data_type == "Unsigned64":
-            sub_avp = Unsigned64(decode_buf=self.avp['AVP_BUF'],
-                                 level=self.avp['AVP_LEVEL'] + 1)
-        elif sub_avp_data_type == "OctetString":
-            sub_avp = OctetString(decode_buf=self.avp['AVP_BUF'],
-                                  level=self.avp['AVP_LEVEL'] + 1)
-        elif sub_avp_data_type == "Float32":
-            sub_avp = Float32(decode_buf=self.avp['AVP_BUF'],
-                                  level=self.avp['AVP_LEVEL'] + 1)
-        elif sub_avp_data_type == "Float64":
-            sub_avp = Float64(decode_buf=self.avp['AVP_BUF'],
-                                  level=self.avp['AVP_LEVEL'] + 1)
-        else:
-            raise D_ERROR.AvpE_InvalidAvpDataType, \
-                  "错误的数据类型，无法解析：[%s]" % sub_avp_data_type
+        sub_avp = self.create_avp_factory(sub_avp_data_type)
                   
         sub_avp.decode(offset)
         
@@ -99,6 +75,16 @@ ${L}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
                                      通过_reset_avp_length进行设置的，所以这里返回0
         '''
         return 0
+    
+    def _find_avp_data_type(self, avp_code):
+        '''根据传入的AVP_CODE查找到对应的类型
+                      需要加载配置文件后定义
+        '''
+        if avp_code in self.avp_cfg:
+            return self.avp_cfg[avp_code][4]
+        else:
+            raise D_ERROR.AvpE_InvalidEtcParam, \
+                    "没有匹配到相应的AVP_CODE： [%s]" % avp_code
         
     def decode(self, offset=0):
         '''重载改变用途
