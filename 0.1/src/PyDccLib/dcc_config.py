@@ -84,10 +84,10 @@ class DccConfig(object):
         
         my_dict = {}
         
-        line_num = 0
+        #line_num = 0
         for eachline in fh:
             # 格式化行信息
-            line_num += 1
+            #line_num += 1
             
             # 删除配置文件左侧空白
             eachline = self.re_ltrip_space.sub("", eachline)
@@ -98,7 +98,8 @@ class DccConfig(object):
             if line_list[0] == "AVP_NAME":
                 my_dict["TOTLE"] = line_list
             else:
-                my_dict[int(line_list[2])] = line_list
+                #my_dict[int(line_list[2])] = line_list
+                my_dict[line_list[2]] = line_list
                 
         fh.close()
         #print u"加载[%s],[%d]条" % (CmdCodeStr, line_num)

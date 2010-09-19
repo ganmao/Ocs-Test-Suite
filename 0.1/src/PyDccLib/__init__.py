@@ -40,6 +40,7 @@ import avp_error as D_ERROR
 import dcc_config as DCF
 
 from dcc_engine import DiameterEngine as DE
+from dcc_msg import DMSG
 
 # AVP基类
 from avp import AVP

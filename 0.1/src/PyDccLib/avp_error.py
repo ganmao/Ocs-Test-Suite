@@ -21,8 +21,21 @@ class DCCException(Exception):
     
     def __str__(self):
         return str(self.msg)
-
-
+    
+class DccE_InvalidDccType(DCCException):
+    '''Dcc类型错误'''
+    def __init__(self, msg=None):
+        DCCException.__init__(self, msg)
+    def __name__(self):
+        return "DccE_InvalidDccType"
+    
+class DccE_InvalidDccstate(DCCException):
+    '''Dcc状态错误'''
+    def __init__(self, msg=None):
+        DCCException.__init__(self, msg)
+    def __name__(self):
+        return "DccE_InvalidDccstate"
+    
 class AvpException(DCCException):
     '''
     AVP异常错误基类,继承自DCCException

@@ -27,11 +27,19 @@ class AVP(object):
         
         # 可读格式输出模板
         self.print_template = Template("\
-${L}AVP_CODE=${AVP_CODE} - ${AVP_NAME} - ${AVP_DATA_TYPE}(\"${AVP_CODE_OPERATOR}\") \n\
-${L}AVP_FLAG=${AVP_FLAG} (VENDOR_ID(${AVP_VENDOR_ID})|MANDATORY(${AVP_MANDATORY})|PRIVATE(${AVP_PRIVATE}) \n\
-${L}AVP_LENGTH=${AVP_LENGTH} \n\
-${L}AVP_VENDOR_ID=${AVP_VENDOR_ID} \n\
-${L}AVP_DATA=${AVP_DATA}\n\
+${L}AVP_CODE      = [${AVP_CODE}] - ${AVP_NAME} - ${AVP_DATA_TYPE}(\"${AVP_CODE_OPERATOR}\") \n\
+${L}AVP_FLAG      = [${AVP_FLAG}] (VENDOR_ID(${AVP_VENDOR_ID})|MANDATORY(${AVP_MANDATORY})|PRIVATE(${AVP_PRIVATE}) \n\
+${L}AVP_LENGTH    = [${AVP_LENGTH}] \n\
+${L}AVP_VENDOR_ID = [${AVP_VENDOR_ID}] \n\
+${L}AVP_DATA      = [${AVP_DATA}]\n\
+${L}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+        
+        self.print_detail_template = Template("\
+${L}${AVP_CODE_HEX}\n${L}\tAVP_CODE      = [${AVP_CODE}] - ${AVP_NAME} - ${AVP_DATA_TYPE}(\"${AVP_CODE_OPERATOR}\") \n\
+${L}${AVP_FLAGS_HEX}\n${L}\tAVP_FLAG      = [${AVP_FLAG}] (VENDOR_ID(${AVP_VENDOR_ID})|MANDATORY(${AVP_MANDATORY})|PRIVATE(${AVP_PRIVATE}) \n\
+${L}${AVP_LENGTH_HEX}\n${L}\tAVP_LENGTH    = [${AVP_LENGTH}] \n\
+${L}${AVP_VONDER_HEX}\n${L}\tAVP_VENDOR_ID = [${AVP_VENDOR_ID}] \n\
+${L}${AVP_DATA_HEX}\n${L}\tAVP_DATA      = [${AVP_DATA}]\n\
 ${L}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
         
         self.simple_print_template = Template("${L}${AVP_NAME}(${AVP_CODE}) = [${AVP_DATA}]")
@@ -69,10 +77,17 @@ ${L}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
                 raise D_ERROR.AvpE_InvalidInitParam, \
                     "初始化参数错误，请检查！\n\tAVP_CODE=0"
         
-        self.avp['AVP_LEVEL']          = level
+        self.avp['AVP_LEVEL']          = int(level)
         self.avp['AVP_CODE_OPERATOR']  = "!i"
         self.avp['AVP_DATA_TYPE']      = "Integer32"
         self.avp['L']                  = self.avp['AVP_LEVEL'] * "\t"
+        
+        self.avp['AVP_CODE_HEX']       = None
+        self.avp['AVP_FLAGS_HEX']      = None
+        self.avp['AVP_LENGTH_HEX']     = None
+        self.avp['AVP_VONDER_HEX']     = None
+        self.avp['AVP_DATA_HEX']       = None
+        self.avp['AVP_ORDER']          = 0
         
     def __del__(self):
         del self.avp
@@ -133,20 +148,27 @@ ${L}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
     
     def encde_data(self):
         '''编码AVP_DATA'''
+        if type(self.avp['AVP_DATA']) == type(u"a"):
+            self.avp['AVP_DATA'] = str(self.avp['AVP_DATA'])
+            
         return pack(self.avp['AVP_CODE_OPERATOR'], self.avp['AVP_DATA'])
         
     def encode(self):
         '''编码整个AVP包，返回编码后的PACK_BUF'''
         if self.avp['AVP_CODE_STATE'] != "00":
             raise D_ERROR.AvpE_InvalidCodeState, \
-                    "错误的状态[%s]，请检查实例化的参数是否错误！" % \
+                    "错误的状态[%s]，当前无法继续编码！" % \
                      self.avp['AVP_CODE_STATE']
                      
+        self.avp['AVP_CODE'] = int(self.avp['AVP_CODE'])
+                     
         self.avp['AVP_BUF'] = self.encde_data()
+        self.avp['AVP_DATA_HEX'] = "0x" + self.avp['AVP_BUF']
         
         self.avp['AVP_BUF'] = self.encode_head() + self.avp['AVP_BUF']
         
         self.avp['AVP_CODE_STATE'] = "02"
+            
         return self.avp['AVP_BUF']
     
     def decode_head(self, offset=0):
@@ -156,6 +178,7 @@ ${L}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
         offset_ = offset
         
         # 解码AVP_CODE
+        
         (self.avp['AVP_CODE'],) = unpack_from("!I", 
                                                  self.avp['AVP_BUF'], 
                                                  offset_)
@@ -165,8 +188,8 @@ ${L}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
         (flags_and_length,)       = unpack_from("!I", 
                                                 self.avp['AVP_BUF'], 
                                                 offset_)
-        self.avp['AVP_FLAG']   = (flags_and_length >> 24)
-        self.avp['AVP_LENGTH'] = (flags_and_length & 0x00FFFFFF)
+        self.avp['AVP_FLAG']      = (flags_and_length >> 24)
+        self.avp['AVP_LENGTH']    = (flags_and_length & 0x00FFFFFF)
         offset_                  += 4
         
         # 解析 VENDOR_ID
@@ -211,6 +234,8 @@ ${L}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
         (self.avp['AVP_DATA'],) = unpack_from(self.avp['AVP_CODE_OPERATOR'], 
                                                  self.avp['AVP_BUF'], 
                                                  offset)
+        self.avp['AVP_DATA_HEX'] = pack(self.avp['AVP_CODE_OPERATOR'], 
+                                        self.avp['AVP_DATA'])
         return self.avp['AVP_LENGTH']
     
     def decode(self, offset=0):
@@ -226,6 +251,7 @@ ${L}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
         
         self._fmt_avp_data()
         self.avp['AVP_CODE_STATE'] = "12"
+        
         return self.avp['AVP_BUF']
     
     def _reset_operator_type(self):
@@ -294,8 +320,10 @@ ${L}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
                     self.avp['AVP_CODE_STATE']
     
     def set_avp_level(self, level):
+        '''重设具体的self.avp['AVP_LEVEL']值,重新计算self.avp['L']'''
         if self.avp['AVP_CODE_STATE'] == "00":
             self.avp['AVP_LEVEL'] = level
+            self.avp['L'] = self.avp['AVP_LEVEL'] * "\t"
         else:
             raise D_ERROR.AvpE_InvalidCodeState, \
                     "错误的编码状态[%s]，当前不能设置AVP_LEVEL！" % \
@@ -325,20 +353,40 @@ ${L}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
                     "错误的编码状态[%s]，当前不能设置AVP_PRIVATE！" % \
                     self.avp['AVP_CODE_STATE']
         
-    def print_avp(self):
+    def print_avp(self, d_print=1):
         '''按照规定格式输出数据'''
         if (self.avp['AVP_CODE_STATE'] == "02" 
             or self.avp['AVP_CODE_STATE'] == "12"):
-            print self.print_template.safe_substitute(self.avp)
+            print_buf = ""
+            
+            if ACD.const.DEBUG_LEVEL == "DEBUG":
+                from binascii import b2a_hex
+                self.avp['AVP_CODE_HEX']   = "0x" + ("%08X" % self.avp['AVP_CODE'])
+                self.avp['AVP_FLAGS_HEX']  = "0x" + ("%02X" % self.avp['AVP_FLAG'])
+                self.avp['AVP_LENGTH_HEX'] = "0x" + ("%06X" % self.avp['AVP_LENGTH'])
+                if self.avp['AVP_VENDOR_ID'] is not None:
+                    self.avp['AVP_VONDER_HEX'] = "0x" + ("%08X" % self.avp['AVP_VENDOR_ID'])
+                self.avp['AVP_DATA_HEX']   = "0x" + b2a_hex(self.avp['AVP_DATA_HEX']).upper()
+                if d_print == 1:
+                    print self.print_detail_template.safe_substitute(self.avp)
+                else:
+                    print_buf += self.print_detail_template.safe_substitute(self.avp)
+            else:
+                print self.print_template.safe_substitute(self.avp)
         else:
             raise D_ERROR.AvpE_InvalidCodeState, \
                   '解码/编码状态错误： %s' % self.avp['AVP_CODE_STATE']
+                  
+        return print_buf
         
-    def pa(self):
+    def pa(self, d_print=1):
         '''简单输出格式'''
         if (self.avp['AVP_CODE_STATE'] == "02" 
             or self.avp['AVP_CODE_STATE'] == "12"):
-            print self.simple_print_template.safe_substitute(self.avp)
+            if d_print == 1:
+                print self.simple_print_template.safe_substitute(self.avp)
+            else:
+                return self.simple_print_template.safe_substitute(self.avp)
         else:
             raise D_ERROR.AvpE_InvalidCodeState, \
                   '解码/编码状态错误： %s' % self.avp['AVP_CODE_STATE']

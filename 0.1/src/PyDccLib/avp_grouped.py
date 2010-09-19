@@ -32,27 +32,37 @@ class Grouped(AVP):
         
         self.avp['AVP_DATA_TYPE']    = "Grouped"
         
-        self.avp['GROUP_SUB_BUF']    = "" # 用来保存Grouped内部子AVP_BUF
-        self.avp['GROUPED_SUBS_AVP'] = []
-        self.avp['AVP_CODE_OPERATOR'] = None
+        self.avp['GROUPED_SUBS_BUF']    = "" # 用来保存Grouped内部子AVP_BUF
+        self.avp['GROUPED_SUBS_AVP'] = [] # 保存解码或者加密后的avp实例
         
         self.print_template_group = Template("\
-${L}AVP_CODE=${AVP_CODE} - ${AVP_NAME} - ${AVP_DATA_TYPE}(\"${AVP_CODE_OPERATOR}\") \n\
-${L}AVP_FLAG=${AVP_FLAG} (VENDOR_ID(${AVP_VENDOR_ID})|MANDATORY(${AVP_MANDATORY})|PRIVATE(${AVP_PRIVATE}) \n\
-${L}AVP_LENGTH=${AVP_LENGTH} \n\
-${L}AVP_VENDOR_ID=${AVP_VENDOR_ID} \n\
-${L}AVP_DATA=${AVP_BUF}\n\
+${L}AVP_CODE      = [${AVP_CODE}] - ${AVP_NAME} - ${AVP_DATA_TYPE}(\"${AVP_CODE_OPERATOR}\") \n\
+${L}AVP_FLAG      = [${AVP_FLAG}] (VENDOR_ID(${AVP_VENDOR_ID})|MANDATORY(${AVP_MANDATORY})|PRIVATE(${AVP_PRIVATE}) \n\
+${L}AVP_LENGTH    = [${AVP_LENGTH}] \n\
+${L}AVP_VENDOR_ID = [${AVP_VENDOR_ID}] \n\
+${L}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+        
+        self.print_detail_template_group = Template("\
+${L}${AVP_CODE_HEX}\n${L}\tAVP_CODE      = [${AVP_CODE}] - ${AVP_NAME} - ${AVP_DATA_TYPE}(\"${AVP_CODE_OPERATOR}\") \n\
+${L}${AVP_FLAGS_HEX}\n${L}\tAVP_FLAG      = [${AVP_FLAG}] (VENDOR_ID(${AVP_VENDOR_ID})|MANDATORY(${AVP_MANDATORY})|PRIVATE(${AVP_PRIVATE}) \n\
+${L}${AVP_LENGTH_HEX}\n${L}\tAVP_LENGTH    = [${AVP_LENGTH}] \n\
+${L}${AVP_VONDER_HEX}\n${L}\tAVP_VENDOR_ID = [${AVP_VENDOR_ID}] \n\
 ${L}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
         
     def encde_data(self):
         '''重载改变用途,直接返回已经打包好的PAVK_BUF'''
-        self.avp['AVP_DATA'] = binascii.b2a_hex(self.avp['GROUP_SUB_BUF'])
-        return self.avp['GROUP_SUB_BUF']
-    
-    def append(self, pack_buf):
-        '''Grouped专用来给其添加子AVP'''
+        self.avp['AVP_DATA'] = binascii.b2a_hex(self.avp['GROUPED_SUBS_BUF'])
+        return self.avp['GROUPED_SUBS_BUF']
+            
+    def append(self, avp_instance):
+        '''接受传入的AVP实例，之后进行编码，将编码后的结果放入self.avp['GROUPED_SUBS_BUF']'''
         if self.avp['AVP_CODE_STATE'] == "00":
-            self.avp['GROUP_SUB_BUF'] += pack_buf
+            self.avp['GROUPED_SUBS_BUF'] += avp_instance.encode()
+            avp_instance.set_avp_level(avp_instance.avp['AVP_LEVEL'] + 1)
+            self.avp['GROUPED_SUBS_AVP'].append(avp_instance.avp)
+        else:
+            raise D_ERROR.AvpE_InvalidCodeState, \
+                    "状态错误[%s]！不能添加新的子AVP" % self.avp['AVP_CODE_STATE']
         
     def decode_data(self, offset=0):
         '''重载，需要根据不同的类型进行解码
@@ -106,29 +116,72 @@ ${L}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
         self.avp['AVP_CODE_STATE'] = "12"
         return self.avp['AVP_BUF']
         
-    def print_avp(self):
+    def print_avp(self, d_print=1):
         '''根据Grouped重载'''
         if (self.avp['AVP_CODE_STATE'] == "02" 
             or self.avp['AVP_CODE_STATE'] == "12"):
-            print self.print_template_group.safe_substitute(self.avp)
+            print_buf = ""
+            import avp_const_define as ACD
             
-            # 循环遍历self.avp['GROUPED_SUBS_AVP']，打印
-            for sub_avp in self.avp['GROUPED_SUBS_AVP']:
-                print self.print_template.safe_substitute(sub_avp)
+            if ACD.const.DEBUG_LEVEL == "DEBUG": 
+                from binascii import b2a_hex
+                self.avp['AVP_CODE_HEX']   = "0x" + ("%08X" % self.avp['AVP_CODE'])
+                self.avp['AVP_FLAGS_HEX']  = "0x" + ("%02X" % self.avp['AVP_FLAG'])
+                self.avp['AVP_LENGTH_HEX'] = "0x" + ("%06X" % self.avp['AVP_LENGTH'])
+                if self.avp['AVP_VENDOR_ID'] is not None:
+                    self.avp['AVP_VONDER_HEX'] = "0x" + ("%08X" % self.avp['AVP_VENDOR_ID'])
+                
+                if d_print == 1:
+                    print self.print_detail_template_group.safe_substitute(self.avp)
+                else:
+                    print_buf += self.print_detail_template_group.safe_substitute(self.avp)
+                    
+                # 循环遍历self.avp['GROUPED_SUBS_AVP']，打印
+                for sub_avp in self.avp['GROUPED_SUBS_AVP']:
+                    sub_avp['AVP_CODE_HEX']   = "0x" + ("%08X" % sub_avp['AVP_CODE'])
+                    sub_avp['AVP_FLAGS_HEX']  = "0x" + ("%02X" % sub_avp['AVP_FLAG'])
+                    sub_avp['AVP_LENGTH_HEX'] = "0x" + ("%06X" % sub_avp['AVP_LENGTH'])
+                    if sub_avp['AVP_VENDOR_ID'] is not None:
+                        sub_avp['AVP_VONDER_HEX'] = "0x" + ("%08X" % sub_avp['AVP_VENDOR_ID'])
+                    sub_avp['AVP_DATA_HEX']   = "0x" + b2a_hex(sub_avp['AVP_DATA_HEX']).upper()
+                
+                    if d_print == 1:
+                        print self.print_detail_template.safe_substitute(sub_avp)
+                    else:
+                        print_buf += self.print_detail_template.safe_substitute(sub_avp)
+            else:
+            
+                print self.print_template_group.safe_substitute(self.avp)
+            
+                # 循环遍历self.avp['GROUPED_SUBS_AVP']，打印
+                for sub_avp in self.avp['GROUPED_SUBS_AVP']:
+                    print self.print_template.safe_substitute(sub_avp)
                 
         else:
             raise D_ERROR.AvpE_InvalidCodeState, \
                   '解码/编码状态错误： %s' % self.avp['AVP_CODE_STATE']
         
-    def pa(self):
+        return print_buf
+        
+    def pa(self, d_print=1):
         '''简单输出格式'''
         if (self.avp['AVP_CODE_STATE'] == "02" 
             or self.avp['AVP_CODE_STATE'] == "12"):
-            print self.simple_print_template.safe_substitute(self.avp)
-            
-            # 循环遍历self.avp['GROUPED_SUBS_AVP']，打印
-            for sub_avp in self.avp['GROUPED_SUBS_AVP']:
-                print self.simple_print_template.safe_substitute(sub_avp)
+            print_buf = ""
+            if d_print == 1:
+                print self.simple_print_template.safe_substitute(self.avp)
+                    
+                # 循环遍历self.avp['GROUPED_SUBS_AVP']，打印
+                for sub_avp in self.avp['GROUPED_SUBS_AVP']:
+                    print self.simple_print_template.safe_substitute(sub_avp)
+            else:
+                print_buf += self.simple_print_template.safe_substitute(self.avp)
+                for sub_avp in self.avp['GROUPED_SUBS_AVP']:
+                    print_buf += self.simple_print_template.safe_substitute(sub_avp)
         else:
             raise D_ERROR.AvpE_InvalidCodeState, \
                   '解码/编码状态错误： %s' % self.avp['AVP_CODE_STATE']
+                  
+        return print_buf
+    
+    

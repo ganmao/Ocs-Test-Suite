@@ -12,6 +12,9 @@ import const
 # 配置文件路径
 const.ETC_PATH = "./etc"
 
+# 调试等级
+const.DEBUG_LEVEL = "DEBUG"
+
 # AVP_FLAGS中的定义
 const.AVP_FLAG_VENDOR    = 0x80
 const.AVP_FLAG_MANDATORY = 0x40
