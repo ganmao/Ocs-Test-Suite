@@ -71,7 +71,7 @@ ${L}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
         '''
         (sub_avp_code,) = unpack_from("!I", self.avp['AVP_BUF'], offset)
         
-        sub_avp_data_type = self._find_avp_data_type(sub_avp_code)
+        sub_avp_data_type = self._find_avp_data_type(str(sub_avp_code))
         
         sub_avp = self.create_avp_factory(sub_avp_data_type)
                   

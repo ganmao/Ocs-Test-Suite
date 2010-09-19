@@ -83,13 +83,13 @@ class Test_PyDccAvp(unittest.TestCase):
         avp_cfg = self.dcc_cfg.CCR
         my_avp_packer_grouped = PyDccLib.Grouped(456)
         
-        my_avp_packer = PyDccLib.Integer32(278, 456)
+        my_avp_packer = PyDccLib.Integer32('278', 456)
         my_avp_packer_grouped.append(my_avp_packer)
         
-        my_avp_packer = PyDccLib.Integer64(447, 8589934591, 4006, 1)
+        my_avp_packer = PyDccLib.Integer64('447', 8589934591, 4006, 1)
         my_avp_packer_grouped.append(my_avp_packer)
         
-        my_avp_packer = PyDccLib.OctetString(2, "abcdefghi", 10415, 1)
+        my_avp_packer = PyDccLib.OctetString('2', "abcdefghi", 10415, 1)
         my_avp_packer_grouped.append(my_avp_packer)
         
         p_grouped = my_avp_packer_grouped.encode()
@@ -112,8 +112,8 @@ class Test_PyDccLibCfg(unittest.TestCase):
     def test_cfg(self):
         '测试配置文件加载'
         cfg = PyDccLib.DCF.DccConfig()
-        #pprint.pprint(cfg.Cmd2Code)
-        #pprint.pprint(cfg.Code2Cmd)
+        pprint.pprint(cfg.Cmd2Code)
+        pprint.pprint(cfg.Code2Cmd)
         #pprint.pprint(cfg.CCA)
         #pprint.pprint(cfg.CCR)
         
@@ -126,6 +126,15 @@ class Test_DccMsg(unittest.TestCase):
         self.pack_buf = None
         self.msg = PyDccLib.DMSG(self.dcc_cfg)
         self.de = PyDccLib.DE()
+        self.pack_buf_hex = ""
+        
+    def test_unpack(self):
+        '测试解包DCC 消息'
+        pb = binascii.a2b_hex("010000688000011000000004075bcd1625100315000001160000000c000001c8000001bf0000001000000001ffffffff0000000200000014616263646566676869000000000001a40000000c000000b4000001a50000001000000000000000c8000001b500000008")
+        unp = self.msg.unpack(pb)
+        print "==",self.msg.dmsg['DCC_AVP_LIST']
+        self.msg.print_dmsg()
+        #pprint.pprint(unp)
         
     def _test_pack(self):
         '按照LIST传入数据'
@@ -142,13 +151,13 @@ class Test_DccMsg(unittest.TestCase):
         self.avp_list.append(_dict)
         
         self.pack_buf = self.msg.pack("CCR", self.avp_list, 789)
-        self.msg.print_dmsg()
+        #self.msg.print_dmsg()
         self.assertEqual(binascii.b2a_hex(self.pack_buf)[:32], 
                          '010000688000011000000004075bcd16')
         self.assertEqual(binascii.b2a_hex(self.pack_buf)[40:], 
                          '000001160000000c000001c8000001bf0000001000000001ffffffff0000000200000014616263646566676869000000000001a40000000c000000b4000001a50000001000000000000000c8000001b500000008')
         
-    def test_pack_fromfile(self):
+    def _test_pack_fromfile(self):
         '从文件读取需要pack的数据'
         fp = file("a.json", "r")
         line = fp.readline()
@@ -156,12 +165,13 @@ class Test_DccMsg(unittest.TestCase):
         
         self.avp_list = self.de.loads_json(line)
         self.pack_buf = self.msg.pack("CCR", self.avp_list, 789)
-        self.msg.print_dmsg()
+        #self.msg.print_dmsg()
+        self.pack_buf_hex = binascii.b2a_hex(self.pack_buf)
+        print self.pack_buf_hex
         self.assertEqual(binascii.b2a_hex(self.pack_buf)[:32], 
                          '010000688000011000000004075bcd16')
         self.assertEqual(binascii.b2a_hex(self.pack_buf)[40:], 
                          '000001160000000c000001c8000001bf0000001000000001ffffffff0000000200000014616263646566676869000000000001a40000000c000000b4000001a50000001000000000000000c8000001b500000008')
-        
         
 class Test_Engine(unittest.TestCase):
     '从引擎开始测试DCC的使用'

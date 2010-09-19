@@ -162,6 +162,7 @@ ${L}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
                      
         self.avp['AVP_CODE'] = int(self.avp['AVP_CODE'])
                      
+        # TODO: 需要校验传入的长度，不能少于第一个包的长度
         self.avp['AVP_BUF'] = self.encde_data()
         self.avp['AVP_DATA_HEX'] = "0x" + self.avp['AVP_BUF']
         
@@ -252,7 +253,7 @@ ${L}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
         self._fmt_avp_data()
         self.avp['AVP_CODE_STATE'] = "12"
         
-        return self.avp['AVP_BUF']
+        return self.avp
     
     def _reset_operator_type(self):
         '''重置一下operator_type，因为一些string类型的长度不定'''
@@ -321,13 +322,8 @@ ${L}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
     
     def set_avp_level(self, level):
         '''重设具体的self.avp['AVP_LEVEL']值,重新计算self.avp['L']'''
-        if self.avp['AVP_CODE_STATE'] == "00":
-            self.avp['AVP_LEVEL'] = level
-            self.avp['L'] = self.avp['AVP_LEVEL'] * "\t"
-        else:
-            raise D_ERROR.AvpE_InvalidCodeState, \
-                    "错误的编码状态[%s]，当前不能设置AVP_LEVEL！" % \
-                    self.avp['AVP_CODE_STATE']
+        self.avp['AVP_LEVEL'] = level
+        self.avp['L'] = self.avp['AVP_LEVEL'] * "\t"
     
     def set_avp_vonder_id(self, vendor_id):
         if self.avp['AVP_CODE_STATE'] == "00":
