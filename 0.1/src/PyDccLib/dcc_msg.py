@@ -11,10 +11,20 @@ Created on 2010-9-15
 from time import time
 from struct import pack, unpack_from
 from string import Template
-import json
 
 import avp_const_define as ACD
 import avp_error as D_ERROR
+from dcc_engine import DiameterEngine as DE
+
+# TODO: 添加新的数据类型需修改
+from avp_integer32 import Integer32
+from avp_integer64 import Integer64
+from avp_unsigned32 import Unsigned32
+from avp_unsigned64 import Unsigned64
+from avp_octetstring import OctetString
+from avp_float32 import Float32
+from avp_float64 import Float64
+from avp_grouped import Grouped
 
 class DMSG(object):
     '''
@@ -22,26 +32,30 @@ class DMSG(object):
     '''
     def __init__(self, config_instance):
         self.dcc_cfg = config_instance
+        self.de = DE()
         
         self.dmsg = {}
         self.dmsg['DCC_VERSION']      = ACD.const.DMSG_VERSION
-        self.dmsg['DCC_LENGTH']       = 0x000000
+        self.dmsg['DCC_LENGTH']       = 0x00
         self.dmsg['DCC_FLAGS']        = 0x00
-        self.dmsg['DCC_REQUEST']      = 0      #需要将读取配置文件中的对应摄者
-        self.dmsg['DCC_PROXIABLE']    = 0
-        self.dmsg['DCC_ERROR']        = 0
-        self.dmsg['DCC_TPOTENTIALLY'] = 0
-        self.dmsg['DCC_CODE']         = 0x000000
+        self.dmsg['DCC_REQUEST']      = 0x00      #需要将读取配置文件中的对应摄者
+        self.dmsg['DCC_PROXIABLE']    = 0x00
+        self.dmsg['DCC_ERROR']        = 0x00
+        self.dmsg['DCC_TPOTENTIALLY'] = 0x00
+        self.dmsg['DCC_CODE']         = 0x00
         self.dmsg['DCC_NAME']         = ""
         self.dmsg['DCC_APP_ID']       = ACD.const.DMSG_APPLICATION_ID
-        self.dmsg['DCC_HOPBYHOP']     = 0
-        self.dmsg['DCC_ENDTOEND']     = 0
+        self.dmsg['DCC_HOPBYHOP']     = 0x00
+        self.dmsg['DCC_ENDTOEND']     = 0x00
         
         # 存放打包好的数据BUF
         self.dmsg['DCC_BUF']          = None 
         
-        # 编码的时候存储编码/解码后的实例列表
+        # 编码的时候存储实例列表
         self.dmsg['DCC_AVP_LIST']     = []
+        
+        # 编码时存放需要编码的JSON串，解码后存放需要输出的JSON串
+        self.dmsg['DCC_JSON']         = ""
         
         # 00-准备编码，01-消息头编码完成，02-消息整体编码完成
         # 10-准备解码，11-消息头解码完成，12-消息整体解码完成
@@ -69,6 +83,14 @@ ${DCC_ENDTOEND_HEX}\n\
         
     def __del__(self):
         del self.dmsg
+        
+    def __repr__(self):
+        '输出具体需要解包的json或者已经解包后的json'
+        if self.dmsg['DCC_STAT'] in ["01", "02", "12"]:
+            return self.dmsg['DCC_JSON']
+        else:
+            raise D_ERROR.DccE_InvalidDccstate, \
+                        "错误的状态[%s]！当前状态不能使用repr" % self.dmsg['DCC_STAT']
         
     def set_flags_proxiable(self):
         '''P(roxiable) –如果设置，表明该消息可以被Proxy、中继或者复位向。
@@ -131,6 +153,57 @@ ${DCC_ENDTOEND_HEX}\n\
         new_end_by_end = stamp_lower_12bytes << 20 | range_number
         
         return new_end_by_end
+    
+    def find_cmd_name_by_code(self, dcc_cmd_code, dcc_request_flag):
+        '''根据cmd_code与REQUEST标志获取name'''
+        find_tulp = (str(dcc_cmd_code), bin(dcc_request_flag)[2:])
+        dcc_cmd_name = self.dcc_cfg.Code2Cmd[find_tulp][2]
+        return dcc_cmd_name
+        
+    def find_avp_etc(self, dcc_cmd_name):
+        '''根据cmd_name返回具体的AVP配置实例'''
+        if dcc_cmd_name == "CCR":
+            return self.dcc_cfg.CCR
+        elif dcc_cmd_name == "CCA":
+            return self.dcc_cfg.CCA
+        elif dcc_cmd_name == "RAR":
+            return self.dcc_cfg.RAR
+        elif dcc_cmd_name == "RAA":
+            return self.dcc_cfg.RAA
+        elif dcc_cmd_name == "ASR":
+            return self.dcc_cfg.ASR
+        elif dcc_cmd_name == "ASA":
+            return self.dcc_cfg.ASA
+        elif dcc_cmd_name == "DWR":
+            return self.dcc_cfg.DWR
+        elif dcc_cmd_name == "DWA":
+            return self.dcc_cfg.DWA
+        elif dcc_cmd_name == "DPR":
+            return self.dcc_cfg.DPR
+        elif dcc_cmd_name == "DPA":
+            return self.dcc_cfg.DPA
+        elif dcc_cmd_name == "CER":
+            return self.dcc_cfg.CER
+        elif dcc_cmd_name == "CEA":
+            return self.dcc_cfg.CEA
+        else:
+            raise D_ERROR.DccE_InvalidDccType, \
+                    "返回配置实例错误，不支持的类型[%s]" % dcc_cmd_name
+        
+    def decode_avp_code_from_buf(self, decode_buf):
+        '''根据传入的buf UNPACK avp_code'''
+        (avp_code,) = unpack_from("!I", decode_buf)
+        return str(avp_code)
+        
+    def get_avp_etc_by_code(self, avp_code, cmd_etc_instances):
+        '''根据AVP_CODE，从avp_etc_instance中查找具体的数据配置'''
+        if avp_code in cmd_etc_instances:
+            avp_etc = cmd_etc_instances[avp_code]
+        else:
+            raise D_ERROR.AvpE_InvalidEtcParam, \
+                    "没有匹配到相应的AVP_CODE： [%s]" % avp_code
+                    
+        return avp_etc
         
     def _pack_init(self, dcc_code_name, end_by_end_rang_number):
         '''在编码前赋值基本信息'''
@@ -165,122 +238,68 @@ ${DCC_ENDTOEND_HEX}\n\
         self._pack_init(dcc_code_name, end_by_end_rang_number)
         
         ver_and_len = self.dmsg['DCC_VERSION'] << 24 | self.dmsg['DCC_LENGTH']
-        pack_buf += pack("!i", ver_and_len)
+        pack_buf += pack("!I", ver_and_len)
         
         flags_and_code = self.dmsg['DCC_FLAGS'] << 24 | self.dmsg['DCC_CODE']
-        pack_buf += pack("!i", flags_and_code)
+        pack_buf += pack("!I", flags_and_code)
         
-        pack_buf += pack("!i", self.dmsg['DCC_APP_ID'])
+        pack_buf += pack("!I", self.dmsg['DCC_APP_ID'])
         
-        pack_buf += pack("!i", self.dmsg['DCC_HOPBYHOP'])
+        pack_buf += pack("!I", self.dmsg['DCC_HOPBYHOP'])
         
-        pack_buf += pack("!i", self.dmsg['DCC_ENDTOEND'])
+        pack_buf += pack("!I", self.dmsg['DCC_ENDTOEND'])
         
         self.dmsg['DCC_STAT'] = "01"
         
         return pack_buf
     
-    #def _find_etc(self, dcc_code_name):
-    def _find_avp_config_by_name(self, dcc_code_name):
-        '''根据dcc_code_name返回对应配置实例'''
-        if dcc_code_name == "CCR":
-            return self.dcc_cfg.CCR
-        elif dcc_code_name == "CCA":
-            return self.dcc_cfg.CCA
-        elif dcc_code_name == "RAR":
-            return self.dcc_cfg.RAR
-        elif dcc_code_name == "RAA":
-            return self.dcc_cfg.RAA
-        elif dcc_code_name == "ASR":
-            return self.dcc_cfg.ASR
-        elif dcc_code_name == "ASA":
-            return self.dcc_cfg.ASA
-        elif dcc_code_name == "DWR":
-            return self.dcc_cfg.DWR
-        elif dcc_code_name == "DWA":
-            return self.dcc_cfg.DWA
-        elif dcc_code_name == "DPR":
-            return self.dcc_cfg.DPR
-        elif dcc_code_name == "DPA":
-            return self.dcc_cfg.DPA
-        elif dcc_code_name == "CER":
-            return self.dcc_cfg.CER
-        elif dcc_code_name == "CEA":
-            return self.dcc_cfg.CEA
-        else:
-            raise D_ERROR.DccE_InvalidDccType, \
-                    "返回配置实例错误，不支持的类型[%s]" % dcc_code_name
+    def _create_avp_instance(self, cmd_etc_instance, avp_dict):
+        '创建AVP实例'
+        # 从列表中获取需要编码的AVP_CODE和AVP_DATA
+        (avp_code, avp_data) = avp_dict.items()[0]
+            
+        # 根据AVP_CODE获取具体的AVP配置列表
+        avp_etc = self.get_avp_etc_by_code(avp_code, cmd_etc_instance)
+            
+        # 根据avp_etc中的配置类型，创建具体的AVP实例
+        avp_instance = create_avp_factory(avp_etc, avp_data)
+            
+        return avp_instance
     
-    def _create_avp_factory_pack(self, dcc_code_name, avp_code, avp_data):
-        '''根据AVP_CODE创建不同的AVP实例'''
-        # 根据dcc_code_name获取对应的配置实例
-        my_etc = self._find_avp_config_by_name(dcc_code_name)
-        
-        # 根据AVP_CODE获取具体的数据类型
-        if avp_code in my_etc:
-            avp_type_etc = my_etc[avp_code]
-        else:
-            raise D_ERROR.AvpE_InvalidEtcParam, \
-                    "没有匹配到相应的AVP_CODE： [%s]" % avp_code
-        
-        from avp_integer32 import Integer32
-        from avp_integer64 import Integer64
-        from avp_unsigned32 import Unsigned32
-        from avp_unsigned64 import Unsigned64
-        from avp_octetstring import OctetString
-        from avp_float32 import Float32
-        from avp_float64 import Float64
-        from avp_grouped import Grouped
-        
-        # TODO: 添加新的数据类型修改-1
-        if avp_type_etc[4] == "Integer32":
-            my_avp = Integer32(avp_code, avp_data, 
-                               level=(int(avp_type_etc[1])-1))
-        elif avp_type_etc[4] == "Integer64":
-            my_avp = Integer64(avp_code, avp_data, 
-                               level=(int(avp_type_etc[1])-1))
-        elif avp_type_etc[4] == "Unsigned32":
-            my_avp = Unsigned32(avp_code, avp_data, 
-                                level=(int(avp_type_etc[1])-1))
-        elif avp_type_etc[4] == "Unsigned64":
-            my_avp = Unsigned64(avp_code, avp_data, 
-                                level=(int(avp_type_etc[1])-1))
-        elif avp_type_etc[4] == "OctetString":
-            my_avp = OctetString(avp_code, avp_data, 
-                                 level=(int(avp_type_etc[1])-1))
-        elif avp_type_etc[4] == "Float32":
-            my_avp = Float32(avp_code, avp_data, 
-                             level=(int(avp_type_etc[1])-1))
-        elif avp_type_etc[4] == "Float64":
-            my_avp = Float64(avp_code, avp_data, 
-                             level=(int(avp_type_etc[1])-1))
-        elif avp_type_etc[4] == "Grouped":
-            my_avp = Grouped(avp_code, level=(int(avp_type_etc[1])-1), 
-                              avp_config_instance=my_etc)
-        else:
-            raise D_ERROR.AvpE_InvalidAvpDataType, \
-                  "错误的数据类型，无法解析：[%s]" % avp_type_etc[4]
-                
-        return my_avp
+    def _create_group_sub_instance(self, cmd_etc_instance, group_instance, sub_avp_list):
+        'Grouped需要递归调用以将子AVP添加到Grouped中'
+        for sub_dict in sub_avp_list:
+            sub_instance = self._create_avp_instance(cmd_etc_instance, sub_dict)
+            
+            if sub_instance.avp['AVP_DATA_TYPE'] == 'Grouped':
+                sub_group = self._create_group_sub_instance(cmd_etc_instance, sub_instance, sub_dict)
+            
+            group_instance.append(sub_instance)
 
     def pack_AVP(self, dcc_code_name, avp_list):
         '''将AVP都编码打包到一起'''
         pack_buf = ""
-        for a_avp_dict in avp_list:
-            # 根据AVP获取具体的类型
-            (avp_code, avp_data) = a_avp_dict.items()[0]
+        
+        # 根据DCC_NAME获取到相应的配置文件实例
+        cmd_etc_instance = self.find_avp_etc(self.dmsg['DCC_NAME'])
+        
+        for decode_avp_dict in avp_list:
+            avp_instance = self._create_avp_instance(cmd_etc_instance, decode_avp_dict)
             
-            my_avp =  self._create_avp_factory_pack(dcc_code_name, avp_code, avp_data)
-            self.dmsg['DCC_AVP_LIST'].append(my_avp)
+            # 将创建的AVP添加入DCC_AVP_LIST
+            self.dmsg['DCC_AVP_LIST'].append(avp_instance)
             
             # 如果是Grouped递归调用这个函数
-            if my_avp.avp['AVP_DATA_TYPE'] == 'Grouped':
-                pack_buf += self.pack_AVP(dcc_code_name, avp_data)
+            if avp_instance.avp['AVP_DATA_TYPE'] == 'Grouped':
+                self._create_group_sub_instance(cmd_etc_instance, 
+                                                avp_instance, 
+                                                decode_avp_dict.items()[0][1])
                 
-            pack_buf += my_avp.encode()
+            # 将所有编码后的数据整合到一起
+            pack_buf += avp_instance.encode()
             
         return pack_buf
-        
+
     def pack(self, dcc_code_name, avp_list, end_by_end_rang_number):
         '''对于传入的AVP字典进行编码
         dcc_code_name            需要对其进行编码的类型，如：CCR,CCA,DWA,DWR
@@ -291,21 +310,25 @@ ${DCC_ENDTOEND_HEX}\n\
             avp_dict的KEY应该是AVP_CODE
             avp_dict的内容应该是AVP_DATA
             
-        首先根据avp_dict先添加AVP，之后再编码消息头
+                    首先根据avp_dict先添加AVP，之后再编码消息头
         '''
         self.dmsg['DCC_STAT'] = "00"
         self.dmsg['DCC_NAME'] = dcc_code_name
+        self.dmsg['DCC_JSON'] = self.de.dumps_json(avp_list)
         
-        self.dmsg['DCC_BUF'] = self.pack_AVP(self.dmsg['DCC_NAME'], avp_list)
+        # 对AVP的内容进行编码
+        dcc_avp_buf = self.pack_AVP(self.dmsg['DCC_NAME'], avp_list)
         
-        length = len(self.dmsg['DCC_BUF'])
-        
-        # 20为消息包头的长度，是固定的
+        # 计算编码后AVP的长度,20为消息包头的长度，是固定的
+        length = len(dcc_avp_buf)
         self.dmsg['DCC_LENGTH'] = 20 + length
         
-        self.dmsg['DCC_BUF'] = self.pack_head(dcc_code_name, end_by_end_rang_number) +\
-                                    self.dmsg['DCC_BUF']
-                                    
+        # 编码包头
+        dcc_head_buf = self.pack_head(dcc_code_name, end_by_end_rang_number)
+        
+        # 将包体与包头组合
+        self.dmsg['DCC_BUF'] = dcc_head_buf + dcc_avp_buf
+        
         self.dmsg['DCC_STAT'] = "02"
         return self.dmsg['DCC_BUF']
     
@@ -315,8 +338,13 @@ ${DCC_ENDTOEND_HEX}\n\
         (ver_and_len,) = unpack_from("!I", pack_buf, offset_)
         offset_ += 4
         self.dmsg['DCC_VERSION'] = ver_and_len >> 24
-        # TODO: 根绝解析长度去校验总长度，如果不符报错
+        
         self.dmsg['DCC_LENGTH']  = ver_and_len & 0x00FFFFFF
+        
+        if len(pack_buf) != self.dmsg['DCC_LENGTH']:
+            raise D_ERROR.DccE_InvalidLength, \
+                    "传入需解码包长度与包头中标识长度不符！\n\t传入包长度：[%d]\n\t包头中标明长度：[%d]" \
+                    % (len(pack_buf), self.dmsg['DCC_LENGTH'])
         
         (flags_and_code,)  = unpack_from("!I", pack_buf, offset_)
         offset_ += 4
@@ -325,21 +353,22 @@ ${DCC_ENDTOEND_HEX}\n\
         
         if self.dmsg['DCC_FLAGS'] | ACD.const.DMSG_FLAGS_REQUEST \
             == ACD.const.DMSG_FLAGS_REQUEST:
-            self.dmsg['DCC_REQUEST'] = 1
+            self.dmsg['DCC_REQUEST'] = ACD.const.DMSG_FLAGS_REQUEST
+        else:
+            self.dmsg['DCC_REQUEST'] = ACD.const.DMSG_FLAGS_ANSWER
             
         if self.dmsg['DCC_FLAGS'] | ACD.const.DMSG_FLAGS_PROXIABLE \
             == ACD.const.DMSG_FLAGS_REQUEST:
-            self.dmsg['DCC_PROXIABLE'] = 1
+            self.dmsg['DCC_PROXIABLE'] = ACD.const.DMSG_FLAGS_PROXIABLE
             
         if self.dmsg['DCC_FLAGS'] | ACD.const.DMSG_FLAGS_ERROR \
             == ACD.const.DMSG_FLAGS_REQUEST:
-            self.dmsg['DCC_ERROR'] = 1
+            self.dmsg['DCC_ERROR'] = ACD.const.DMSG_FLAGS_ERROR
             
         if self.dmsg['DCC_FLAGS'] | ACD.const.DMSG_FLAGS_TPOTENTIALLY \
             == ACD.const.DMSG_FLAGS_REQUEST:
-            self.dmsg['DCC_TPOTENTIALLY'] = 1
+            self.dmsg['DCC_TPOTENTIALLY'] = ACD.const.DMSG_FLAGS_TPOTENTIALLY
             
-        
         (self.dmsg['DCC_APP_ID'],)   = unpack_from("!I", pack_buf, offset_)
         offset_ += 4
         (self.dmsg['DCC_HOPBYHOP'],) = unpack_from("!I", pack_buf, offset_)
@@ -352,7 +381,7 @@ ${DCC_ENDTOEND_HEX}\n\
     
     def _find_avp_config_by_code(self, cmd_code, request_flag):
         '根据传入的CMD-CODE与请求标志，确定具体解码的消息类型'
-        find_tulp = (str(cmd_code), "%d0000000" % request_flag)
+        find_tulp = (str(cmd_code), bin(request_flag)[2:])
         
         self.dmsg['DCC_NAME'] = self.dcc_cfg.Code2Cmd[find_tulp][2]
         
@@ -383,63 +412,6 @@ ${DCC_ENDTOEND_HEX}\n\
         else:
             raise D_ERROR.DccE_InvalidDccType, \
                     "返回配置实例错误，不支持的类型[%s, %s]" % self.dmsg['DCC_NAME']
-                    
-    def _create_avp_factory_unpack(self, avp_code, decode_buf, avp_config_instance):
-        '''根据AVP_CODE创建不同的AVP实例'''
-        my_etc = avp_config_instance
-        
-        # 根据AVP_CODE获取具体的数据类型
-        if avp_code in my_etc:
-            avp_type_etc = my_etc[avp_code]
-        else:
-            raise D_ERROR.AvpE_InvalidEtcParam, \
-                    "没有匹配到相应的AVP_CODE： [%s]" % avp_code
-        
-        from avp_integer32 import Integer32
-        from avp_integer64 import Integer64
-        from avp_unsigned32 import Unsigned32
-        from avp_unsigned64 import Unsigned64
-        from avp_octetstring import OctetString
-        from avp_float32 import Float32
-        from avp_float64 import Float64
-        from avp_grouped import Grouped
-        
-        # TODO: 添加新的数据类型修改-1
-        if avp_type_etc[4] == "Integer32":
-            my_avp = Integer32(decode_buf=decode_buf,
-                               level=(int(avp_type_etc[1])-1))
-        elif avp_type_etc[4] == "Integer64":
-            my_avp = Integer64(decode_buf=decode_buf,
-                               level=(int(avp_type_etc[1])-1))
-        elif avp_type_etc[4] == "Unsigned32":
-            my_avp = Unsigned32(decode_buf=decode_buf,
-                                level=(int(avp_type_etc[1])-1))
-        elif avp_type_etc[4] == "Unsigned64":
-            my_avp = Unsigned64(decode_buf=decode_buf,
-                                level=(int(avp_type_etc[1])-1))
-        elif avp_type_etc[4] == "OctetString":
-            my_avp = OctetString(decode_buf=decode_buf,
-                                 level=(int(avp_type_etc[1])-1))
-        elif avp_type_etc[4] == "Float32":
-            my_avp = Float32(decode_buf=decode_buf,
-                             level=(int(avp_type_etc[1])-1))
-        elif avp_type_etc[4] == "Float64":
-            my_avp = Float64(decode_buf=decode_buf,
-                             level=(int(avp_type_etc[1])-1))
-        elif avp_type_etc[4] == "Grouped":
-            my_avp = Grouped(decode_buf=decode_buf,
-                               avp_config_instance=my_etc,
-                               level=(int(avp_type_etc[1])-1))
-        else:
-            raise D_ERROR.AvpE_InvalidAvpDataType, \
-                  "错误的数据类型，无法解析：[%s]" % avp_type_etc[4]
-                
-        return my_avp
-    
-    def _unpack_avp_code_from_buf(self, avp_pack_buf):
-        '从传入的avp_pack_buf里面解析出来avp_code，注意传入的不能含有DCC消息头'
-        (avp_code,) = unpack_from("!I", avp_pack_buf)
-        return avp_code
             
     def unpack(self, pack_buf):
         '''解包DCC消息，返回解包后的一个字典
@@ -451,31 +423,53 @@ ${DCC_ENDTOEND_HEX}\n\
         
         # 解析包头
         offset = self.unpack_head(self.dmsg['DCC_BUF'])
+
+        # 根据CMD_CODE查找CMD_NAME
+        self.dmsg['DCC_NAME'] = self.find_cmd_name_by_code(self.dmsg['DCC_CODE'], 
+                                                           self.dmsg['DCC_REQUEST'])
         
-        # 根据CODE查找具体的CMD_NAME, 并且返回对应的配置实例
-        avp_config = self._find_avp_config_by_code(self.dmsg['DCC_CODE'], 
-                                                   self.dmsg['DCC_REQUEST'])
+        # 根据DCC_NAME获取到相应的配置文件实例
+        cmd_etc_instance = self.find_avp_etc(self.dmsg['DCC_NAME'])
         
         while offset != self.dmsg['DCC_LENGTH']:
             # 确定具体需要解包的AVP BUF
             avp_pack_buf = self.dmsg['DCC_BUF'][offset:]
             
             # 返回需要解析AVP的AVP_CODE
-            avp_code = str(self._unpack_avp_code_from_buf(avp_pack_buf))
+            avp_code = self.decode_avp_code_from_buf(avp_pack_buf)
             
-            # 根据avp_code和buf创建具体需要解析的avp实例
-            avp = self._create_avp_factory_unpack(avp_code, 
-                                                  avp_pack_buf, 
-                                                  avp_config)
+            # 根据AVP_CODE获取具体的AVP配置列表
+            avp_etc = self.get_avp_etc_by_code(avp_code, cmd_etc_instance)
+            
+            # 根据AVP配置列表中的类型返回实例
+            #my_avp = create_avp_factory(avp_etc, decode_buf=avp_pack_buf, msg_etc=self.dmsg)
+            my_avp = create_avp_factory(avp_etc, decode_buf=avp_pack_buf, msg_etc=cmd_etc_instance)
             
             # AVP解包，并且将解包后结果添加到self.dmsg['DCC_AVP_LIST']
-            avp.decode()
-            self.dmsg['DCC_AVP_LIST'].append(avp)
+            my_avp.decode()
+            self.dmsg['DCC_AVP_LIST'].append(my_avp.avp)
             
-            offset += avp.avp['AVP_LENGTH']
+            offset += my_avp.avp['AVP_LENGTH']
+
         
+        self.dmsg['DCC_JSON'] = self.de.dumps_json( \
+                                      self._create_unpack_json_list( \
+                                                self.dmsg['DCC_AVP_LIST'] \
+                                            ) \
+                                      )
         self.dmsg['DCC_STAT'] = "12"
         return self.dmsg
+    
+    def _create_unpack_json_list(self, avp_list):
+        '创建解包时的json串'
+        json_list = []
+        for avp in avp_list:
+            if avp['AVP_DATA_TYPE'] == 'Grouped':
+                json_list.append({str(avp['AVP_CODE']): self._create_unpack_json_list(avp['GROUPED_SUBS_AVP'])})
+            else:
+                json_list.append({str(avp['AVP_CODE']): avp['AVP_DATA']})
+                
+        return json_list
     
     def print_dmsg(self):
         '''按照格式打印消息包的信息'''
@@ -512,3 +506,65 @@ ${DCC_ENDTOEND_HEX}\n\
             if char_num % 32 == 0: print "\n",
             char_num += 1
     
+def create_avp_factory(avp_etc, encode_data=None, decode_buf=None, msg_etc=None):
+    '''根据传入的avp类型配置列表，返回对应AVP数据类型的实例
+    avp_etc        单条Avp的配置list
+    encode_data    需要编码的avp_code
+    decode_buf    需要解码的buf
+    msg_etc        解码时Greouped类型需要用到全部的配置实例
+    '''
+    # TODO: 添加新的数据类型需修改
+    if avp_etc[4] == "Integer32":
+        my_avp = Integer32(avp_etc[2],
+                           avp_data=encode_data,
+                           decode_buf=decode_buf,
+                           level=(int(avp_etc[1])-1),
+                           cmd_etc_instance=avp_etc)
+    elif avp_etc[4] == "Integer64":
+        my_avp = Integer64(avp_etc[2],
+                           avp_data=encode_data,
+                           decode_buf=decode_buf,
+                           level=(int(avp_etc[1])-1),
+                           cmd_etc_instance=avp_etc)
+    elif avp_etc[4] == "Unsigned32":
+        my_avp = Unsigned32(avp_etc[2],
+                           avp_data=encode_data,
+                           decode_buf=decode_buf,
+                           level=(int(avp_etc[1])-1),
+                           cmd_etc_instance=avp_etc)
+    elif avp_etc[4] == "Unsigned64":
+        my_avp = Unsigned64(avp_etc[2],
+                           avp_data=encode_data,
+                           decode_buf=decode_buf,
+                           level=(int(avp_etc[1])-1),
+                           cmd_etc_instance=avp_etc)
+    elif avp_etc[4] == "OctetString":
+        my_avp = OctetString(avp_etc[2],
+                           avp_data=encode_data,
+                           decode_buf=decode_buf,
+                           level=(int(avp_etc[1])-1),
+                           cmd_etc_instance=avp_etc)
+    elif avp_etc[4] == "Float32":
+        my_avp = Float32(avp_etc[2],
+                           avp_data=encode_data,
+                           decode_buf=decode_buf,
+                           level=(int(avp_etc[1])-1),
+                           cmd_etc_instance=avp_etc)
+    elif avp_etc[4] == "Float64":
+        my_avp = Float64(avp_etc[2],
+                           avp_data=encode_data,
+                           decode_buf=decode_buf,
+                           level=(int(avp_etc[1])-1),
+                           cmd_etc_instance=avp_etc)
+    elif avp_etc[4] == "Grouped":
+        my_avp = Grouped(avp_etc[2],
+                            avp_data=encode_data,
+                            decode_buf=decode_buf,
+                            level=(int(avp_etc[1])-1),
+                            cmd_etc_instance=msg_etc)
+    else:
+        raise D_ERROR.AvpE_InvalidAvpDataType, \
+              "错误的数据类型，无法解析：[%s]" % avp_etc[4]
+              
+    return my_avp
+

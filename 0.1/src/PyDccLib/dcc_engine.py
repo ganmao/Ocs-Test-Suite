@@ -15,13 +15,15 @@ class DiameterEngine(object):
     Diameter 协议解码/编码引擎
     '''
     def __init__(self):
-        # 引擎初始化
-        
-        # 初始化配置文件
-        self.dcf = DccConfig()
+        '引擎初始化'
+        self.dcf = None
         
     def __del__(self):
         del self.dcf
+        
+    def InitConfig(self):
+        '初始化配置参数'
+        self.dcf = DccConfig()
         
     def loads_json(self, json_str):
         '将json的字符串，解析为列表'

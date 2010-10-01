@@ -4,6 +4,7 @@
 Created on 2010-9-9
 
 @author: zdl
+TODO: 整理错误码
 '''
 
 class DCCException(Exception):
@@ -35,6 +36,13 @@ class DccE_InvalidDccstate(DCCException):
         DCCException.__init__(self, msg)
     def __name__(self):
         return "DccE_InvalidDccstate"
+    
+class DccE_InvalidLength(DCCException):
+    '''Dcc状态错误'''
+    def __init__(self, msg=None):
+        DCCException.__init__(self, msg)
+    def __name__(self):
+        return "DccE_InvalidLength"
     
 class AvpException(DCCException):
     '''

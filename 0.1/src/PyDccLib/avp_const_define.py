@@ -5,6 +5,8 @@ Created on 2010-9-4
 @author: zdl
 
 定义AVP的各种常量
+
+TODO: 整理常量的定义
 '''
 
 import const

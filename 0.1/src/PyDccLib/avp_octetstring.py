@@ -6,7 +6,6 @@ Created on 2010-9-13
 @author: zdl
 '''
 from avp import AVP
-import avp_error as D_ERROR
 
 class OctetString(AVP):
     '''
@@ -17,13 +16,16 @@ class OctetString(AVP):
     '''
     def __init__(self, avp_code=0, avp_data=None, vendor_id=0, 
                  mandatory=0, private=0, level=0, decode_buf=None,
-                 avp_config_instance=None):
+                 cmd_etc_instance=None):
         AVP.__init__(self, avp_code, avp_data, vendor_id, 
                      mandatory, private, level, decode_buf,
-                     avp_config_instance)
+                     cmd_etc_instance)
         self.avp['AVP_DATA_TYPE'] = "OctetString"
         
         if self.avp['AVP_CODE_STATE'] == "00":
+            if self.avp['AVP_DATA'] is None:
+                raise self.err.AvpE_InvalidInitParam, \
+                        "初始化OctetString类型错误，AVP编码时必须在初始化时传入 AVP_DATA"
             data_length = len(self.avp['AVP_DATA'])
             data_length = (data_length + 3) // 4 * 4
             self.avp['AVP_CODE_OPERATOR'] = "!" + str(data_length) + "s"
@@ -36,7 +38,7 @@ class OctetString(AVP):
             else:
                 self.avp['AVP_CODE_OPERATOR'] = "!" + str(self.avp['AVP_LENGTH'] - 12) + "s"
         else:
-            raise D_ERROR.AvpE_InvalidCodeState, \
+            raise self.err.AvpE_InvalidCodeState, \
                     "错误的状态[%s]，当前不能重置操作类型！" % \
                      self.avp['AVP_CODE_STATE']
             
@@ -45,7 +47,7 @@ class OctetString(AVP):
         if self.avp['AVP_CODE_STATE'] in ["11", "12"]:
             self.avp['AVP_DATA'] = self.avp['AVP_DATA'].rstrip('\x00')
         else:
-            raise D_ERROR.AvpE_InvalidCodeState, \
+            raise self.err.AvpE_InvalidCodeState, \
                     "错误的状态[%s]，当前状态不能对AVP_DATA进行格式化！" % \
                      self.avp['AVP_CODE_STATE']
         

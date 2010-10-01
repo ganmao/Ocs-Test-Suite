@@ -14,10 +14,10 @@ class Integer32(AVP):
     '''
     def __init__(self, avp_code=0, avp_data=None, vendor_id=0, 
                  mandatory=0, private=0, level=0, decode_buf=None,
-                 avp_config_instance=None):
+                 cmd_etc_instance=None):
         AVP.__init__(self, avp_code, avp_data, vendor_id, 
                      mandatory, private, level, decode_buf,
-                     avp_config_instance)
+                     cmd_etc_instance)
         self.avp['AVP_CODE_OPERATOR']  = "!i"
         self.avp['AVP_DATA_TYPE']      = "Integer32"
         
