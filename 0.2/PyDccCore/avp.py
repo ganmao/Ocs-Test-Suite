@@ -110,7 +110,7 @@ class AVP(object):
             return repr({self.avp['AVP_CODE']:self.avp['AVP_DATA']})
         else:
             raise self.dcc.dcc_err.AvpE_InvalidCodeState, \
-                    "编码/解码还未完成，当前不能输出结果[%s]" % self.avp['AVP_CODE_STATE']
+                    "The Incorrect Status[%s], Can Not Use repr!" % self.avp['AVP_CODE_STATE']
         
     def __str__(self):
         return self.__repr__()
@@ -130,7 +130,7 @@ class AVP(object):
     def __set_avp_operator_type(self):
         '设置编码时指定的编码方式，根据不同的数据类型，在子类中重载'
         raise self.dcc.dcc_err.AvpE_InvalidMethod, \
-                    "未设定对应的AVP类型，请在对应子类中重载 set_avp_encode_type "
+                    "Unknow AVP Type, Can Not Use set_avp_operator_type!"
     
     def __set_avp_vonder_id(self):
         '根据配置文件设置AVP的VONDER ID'
@@ -263,7 +263,7 @@ class AVP(object):
         # 校验AVP_LENGTH是否合法
         if len(self.avp['AVP_BUF']) < self.avp['AVP_LENGTH']:
             raise self.dcc.dcc_err.AvpE_InvalidAvpLength, \
-                    "解析AVP_CODE：[%s]错误！传入的avp长度错误！\n实际长度：[%d]\n包中标明长度：[%d]" % \
+                    "Decode AVP_CODE[%s] Error: The Length In BUF Is Wrong!\nReal Length:[%d]\nPack BUF Length:[%d]" % \
                     (self.avp['AVP_CODE'], len(self.avp['AVP_BUF']), self.avp['AVP_LENGTH'])
         
         
@@ -324,12 +324,12 @@ class AVP(object):
         if (self.avp['AVP_FLAG'] & self.dcc.dcc_def.const.AVP_FLAG_VENDOR) \
                 == self.dcc.dcc_def.const.AVP_FLAG_VENDOR:       # 说明存在VONDER_ID
             if self.avp['AVP_LENGTH'] < 12:
-                raise self.dcc.dcc_err.AvpE_InvalidAvpLength, "AVP的长度定义错误！"
+                raise self.dcc.dcc_err.AvpE_InvalidAvpLength, "The AVP Length less for min Len: 12!"
             
             self.avp['AVP_VENDOR_ID'] = self.dcc.dcc_def.const.AVP_FLAG_VENDOR
         else:
             if self.avp['AVP_LENGTH'] < 8:
-                raise self.dcc.dcc_err.AvpE_InvalidAvpLength, "AVP的长度定义错误！"
+                raise self.dcc.dcc_err.AvpE_InvalidAvpLength, "The AVP Length less for min Len: 8!"
             
         # 解析 MANDATORY
         if (self.avp['AVP_FLAG'] & self.dcc.dcc_def.const.AVP_FLAG_MANDATORY) \
@@ -353,9 +353,17 @@ class AVP(object):
         '''
         self.avp['AVP_CODE_STATE'] = self.dcc.dcc_def.const.DECODE_DCC_AVP_BODY_BEGIN
         
-        (self.avp['AVP_DATA'],) = self.dcc.unpack_from_bin(self.avp['AVP_CODE_OPERATOR'], 
+        try:
+            (self.avp['AVP_DATA'],) = self.dcc.unpack_from_bin(self.avp['AVP_CODE_OPERATOR'], 
                                                            self.avp['AVP_BUF'], 
                                                            offset)
+        except Exception, e:
+            raise self.dcc.dcc_err.AvpE_DecodAvpError, \
+                    "Decode AVP Error:\n%s\ncode=%s\nfmt=%s\nbuf=%s" % (e,
+                                            self.avp['AVP_CODE'],
+                                            self.avp['AVP_CODE_OPERATOR'],
+                                            self.dcc.bin2ascii_hex(self.avp['AVP_BUF'])
+                                            )
         
         # 解码数据类型后进行一些后续处理
         self.__after_decode_data()
@@ -380,7 +388,21 @@ class AVP(object):
             
             avp_flag_bin = self.dcc.bin(self.avp['AVP_FLAG'])
             
-            if level >= 5:
+            if level == 99:
+                avp_txt = ""
+                tab_space = "\t" * (int(self.my_avp_cfg[1]) - 1)
+                if self.avp['AVP_DATA_TYPE'] == 'Grouped':
+                    self.avp['AVP_DATA'] = self.avp['AVP_DATA_TYPE']
+                avp_txt = '%s%s(%s)=[%s]\n' % (tab_space,
+                                       self.my_avp_cfg[0],
+                                       self.avp['AVP_CODE'],
+                                       repr(self.avp['AVP_DATA']))
+                if self.avp['AVP_DATA_TYPE'] == 'Grouped':
+                    for avp_instance in self.avp['SUB_AVP']:
+                        avp_txt += avp_instance.pavp(level)
+                        
+                return avp_txt
+            elif level >= 5:
                 from pprint import pprint
                 pprint(self.avp)
             elif level >= 3:
@@ -411,7 +433,7 @@ AVP_BUF_BIN   = 0x%s
                 tab_space = "\t" * (int(self.my_avp_cfg[1]) - 1)
                 if self.avp['AVP_DATA_TYPE'] == 'Grouped':
                     self.avp['AVP_DATA'] = self.avp['AVP_DATA_TYPE']
-                print '%s%s(%s)=%s' % (tab_space,
+                print '%s%s(%s)=[%s]' % (tab_space,
                                        self.my_avp_cfg[0],
                                        self.avp['AVP_CODE'],
                                        repr(self.avp['AVP_DATA']))

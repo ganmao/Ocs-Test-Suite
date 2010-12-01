@@ -56,7 +56,7 @@ class MSG(object):
             return self.dmsg['DCC_JSON']
         else:
             raise self.dcc.dcc_err.DccE_InvalidDccstate, \
-                        "错误的状态[%s]！当前状态不能使用repr" % self.dmsg['DCC_STAT']
+                        "The Incorrect Status[%s], Can Not Use repr!" % self.dmsg['DCC_STAT']
         
     def __str__(self):
         return self.__repr__()
@@ -81,7 +81,9 @@ class MSG(object):
             self.dmsg['DCC_FLAGS'] |= self.dcc.dcc_def.const.DMSG_FLAGS_ERROR
         else:
             raise self.dcc.dcc_err.DccE_InvalidMethod, \
-                    "方法调用错误，请求消息不能设置 E(rror)标志! 或者状态错误：[%s]" % self.dmsg['DCC_STAT']
+                    "Call set_flags_error() Error:\n \
+                     Can Not Set E(rror) Flag For Request Msg or \
+                     The Proc Status Type(%s) Error!" % self.dmsg['DCC_STAT']
         
     def set_flags_tpotentially(self):
         '''T(Potentially re-transmitted message)-该标记在链路失败过程后被设置，
@@ -101,7 +103,8 @@ class MSG(object):
             self.dmsg['DCC_FLAGS'] |= self.dcc.dcc_def.const.DMSG_FLAGS_TPOTENTIALLY
         else:
             raise self.dcc.dcc_err.DccE_InvalidMethod, \
-                    "方法调用错误，状态错误：[%s]" % self.dmsg['DCC_STAT']
+                    "The Proc Status Type Error! Call set_flags_tpotentially() Error:\n \
+                     [%s]" % self.dmsg['DCC_STAT']
                     
     def __set_hop_by_hop(self, cmd_code):
         '''Hop-by-Hop Identifier：Hop-by-Hop标识符为一个无符号32比特整数字段
@@ -279,7 +282,9 @@ class MSG(object):
         
         if len(pack_buf) != self.dmsg['DCC_LENGTH']:
             raise self.dcc.dcc_err.DccE_InvalidLength, \
-                    "传入需解码包长度与包头中标识长度不符！\n\t传入包长度：[%d]\n\t包头中标明长度：[%d]" \
+                    "The Length Wrong In Msg Head!\n \
+                    \tThe Real Length:[%d]\n \
+                    \tThe Length In Msg Head:[%d]" \
                     % (len(pack_buf), self.dmsg['DCC_LENGTH'])
         
         (flags_and_code,)  = self.dcc.unpack_from_bin("!I", pack_buf, offset_)
@@ -339,13 +344,17 @@ class MSG(object):
             # 确定具体需要解包的AVP BUF
             avp_pack_buf = self.dmsg['DCC_BUF'][offset:]
             
-            # 返回需要解析AVP的AVP_INSTANCE
-            avp_instance = create_avp(cmd_code = (int(self.dmsg['DCC_CODE']), int(self.dmsg['DCC_REQUEST'])),
+            try:
+                # 返回需要解析AVP的AVP_INSTANCE
+                avp_instance = create_avp(cmd_code = (int(self.dmsg['DCC_CODE']), int(self.dmsg['DCC_REQUEST'])),
                                         avp_code = None,
                                         avp_data = None,
                                         decode_buf = avp_pack_buf,
                                         dcc_instance = self.dcc
                                         )
+            except Exception, e:
+                raise self.dcc.dcc_err.DccE_CreateAvpError, \
+                        "Create Avp Instance Error: %s" % e
             
             # AVP解包，并且将解包后结果添加到self.dmsg['DCC_AVP_LIST']
             avp_instance.decode()
@@ -367,38 +376,60 @@ class MSG(object):
         '''按照格式打印消息包的信息'''
         if self.dmsg['DCC_STAT'] in (self.dcc.dcc_def.const.ENCODE_DCC_MSG_END,
                                      self.dcc.dcc_def.const.DECODE_DCC_MSG_END):
-            bin_flags = self.dcc.bin(self.dmsg['DCC_FLAGS'])
-            
-            print 'Version               = 0x%02X(%d)' % (self.dmsg['DCC_VERSION'], self.dmsg['DCC_VERSION'])
-            print 'Message Length        = 0x%06X(%d)' % (self.dmsg['DCC_LENGTH'], self.dmsg['DCC_LENGTH'])
-            print 'command flags         = 0x%02X(%s)' % (self.dmsg['DCC_FLAGS'], bin_flags)
-            print 'Command-Code          = 0x%06X(%d)' % (self.dmsg['DCC_CODE'], self.dmsg['DCC_CODE'])
-            print 'Application-ID        = 0x%08X(%d)' % (self.dmsg['DCC_APP_ID'], self.dmsg['DCC_APP_ID'])
-            print 'Hop-by-Hop Identifier = 0x%08X(%d)' % (self.dmsg['DCC_HOPBYHOP'], self.dmsg['DCC_HOPBYHOP'])
-            print 'End-to-End Identifier = 0x%08X(%d)' % (self.dmsg['DCC_ENDTOEND'], self.dmsg['DCC_ENDTOEND'])
-            print "=================================="
-            for avp in self.dmsg['DCC_AVP_LIST']:
-                avp.pavp(level)
+            if level == 99:
+                msg_txt = ""
+                bin_flags = self.dcc.bin(self.dmsg['DCC_FLAGS'])
+                
+                msg_txt += 'Version               = 0x%02X(%d)\n' % (self.dmsg['DCC_VERSION'], self.dmsg['DCC_VERSION'])
+                msg_txt += 'Message Length        = 0x%06X(%d)\n' % (self.dmsg['DCC_LENGTH'], self.dmsg['DCC_LENGTH'])
+                msg_txt += 'command flags         = 0x%02X(%s)\n' % (self.dmsg['DCC_FLAGS'], bin_flags)
+                msg_txt += 'Command-Code          = 0x%06X(%d)\n' % (self.dmsg['DCC_CODE'], self.dmsg['DCC_CODE'])
+                msg_txt += 'Application-ID        = 0x%08X(%d)\n' % (self.dmsg['DCC_APP_ID'], self.dmsg['DCC_APP_ID'])
+                msg_txt += 'Hop-by-Hop Identifier = 0x%08X(%d)\n' % (self.dmsg['DCC_HOPBYHOP'], self.dmsg['DCC_HOPBYHOP'])
+                msg_txt += 'End-to-End Identifier = 0x%08X(%d)\n' % (self.dmsg['DCC_ENDTOEND'], self.dmsg['DCC_ENDTOEND'])
+                msg_txt += "..................................\n"
+                for avp in self.dmsg['DCC_AVP_LIST']:
+                    msg_txt += avp.pavp(level)
                     
-            print "=================================="
+                return msg_txt
+            else:
+                bin_flags = self.dcc.bin(self.dmsg['DCC_FLAGS'])
+                
+                print 'Version               = 0x%02X(%d)' % (self.dmsg['DCC_VERSION'], self.dmsg['DCC_VERSION'])
+                print 'Message Length        = 0x%06X(%d)' % (self.dmsg['DCC_LENGTH'], self.dmsg['DCC_LENGTH'])
+                print 'command flags         = 0x%02X(%s)' % (self.dmsg['DCC_FLAGS'], bin_flags)
+                print 'Command-Code          = 0x%06X(%d)' % (self.dmsg['DCC_CODE'], self.dmsg['DCC_CODE'])
+                print 'Application-ID        = 0x%08X(%d)' % (self.dmsg['DCC_APP_ID'], self.dmsg['DCC_APP_ID'])
+                print 'Hop-by-Hop Identifier = 0x%08X(%d)' % (self.dmsg['DCC_HOPBYHOP'], self.dmsg['DCC_HOPBYHOP'])
+                print 'End-to-End Identifier = 0x%08X(%d)' % (self.dmsg['DCC_ENDTOEND'], self.dmsg['DCC_ENDTOEND'])
+                print "=================================="
+                for avp in self.dmsg['DCC_AVP_LIST']:
+                    avp.pavp(level)
+                        
+                print "=================================="
         else:
             raise self.dcc.dcc_err.DccE_InvalidDccstate, \
-                    "DCC消息状态错误[%s]！不能打印详细信息" % self.dmsg['DCC_STAT']
+                    "Can Not Print Detail Info, Ten Wrong DCC Msg Status:[%s]!" % self.dmsg['DCC_STAT']
         
-    def fmt_hex(self, buf):
+    def fmt_hex(self, hex_buf):
         '''将16进制的字符串格式化输出'''
         char_num = 1
         pstr = ""
-        for char in buf:
+        out_str = ""
+        for char in hex_buf:
             if char_num % 2 != 0:
                 pstr += char
             else:
                 pstr += char
-                print pstr,
+                out_str = out_str + pstr + " "
                 pstr = ""
                 
-            if char_num % 32 == 0: print "\n",
+            if char_num % 32 == 0:
+                out_str += "\n"
+                
             char_num += 1
+            
+        return out_str
     
 def create_avp_factory(avp_etc, encode_data=None, decode_buf=None, msg_etc=None):
     '''根据传入的avp类型配置列表，返回对应AVP数据类型的实例
@@ -488,7 +519,7 @@ def create_avp_factory(avp_etc, encode_data=None, decode_buf=None, msg_etc=None)
                             cmd_etc_instance=avp_etc)
     else:
         raise D_ERROR.AvpE_InvalidAvpDataType, \
-              "错误的数据类型，无法解析：[%s]" % avp_etc[4]
+              "Unknown AVP Data Type:[%s]" % avp_etc[4]
               
     return my_avp
 

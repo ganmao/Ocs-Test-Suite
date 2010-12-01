@@ -92,7 +92,7 @@ class DCC(object):
             return outStamp
         else:
             raise DCC_ERR.AvpE_InvalidInitParam,\
-                        "传入的时间格式错误！[%s][%s]" % (self.TIMEFORMAT, time_str)
+                        "The Time Format Error:\nfmt=%s, input=%s" % (self.TIMEFORMAT, time_str)
         
     def Time2TUCStamp(self, time_str):
         '将年月日的时间格式转换为UTC时间戳'
@@ -106,7 +106,7 @@ class DCC(object):
             return mktime(myFormat)
         else:
             raise DCC_ERR.AvpE_InvalidInitParam,\
-                        "传入的时间格式错误！[%s][%s]" % (self.TIMEFORMAT, time_str)
+                        "The Time Format Error:\nfmt=%s, input=%s" % (self.TIMEFORMAT, time_str)
     
     def utf8encoder(self, nonu8str):
         '将unicode编码为UTF8格式'
@@ -169,7 +169,7 @@ class DCC(object):
             return self.dcc_def.const.CAPABILITIES_EXCHANGE_ANSWER
         else:
             raise self.dcc_err.DccE_InvalidDccType, \
-                        "传入错误的CMD_CODE:%s" % cmd_code_str
+                        "The CMD_CODE Error:%s" % cmd_code_str
     
     def bin(self, num):
         '将数据转为二进制表示'

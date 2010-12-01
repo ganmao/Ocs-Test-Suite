@@ -52,6 +52,13 @@ class DccE_InvalidMethod(DCCException):
     def __name__(self):
         return "DccE_InvalidMethod"
     
+class DccE_CreateAvpError(DCCException):
+    '''创建AVP实例错误'''
+    def __init__(self, msg=None):
+        DCCException.__init__(self, msg)
+    def __name__(self):
+        return "DccE_CreateAvpError"
+    
 class AvpException(DCCException):
     '''
     AVP异常错误基类,继承自DCCException
@@ -116,3 +123,11 @@ class AvpE_InvalidAvpCode(AvpException):
         AvpException.__init__(self, msg)
     def __name__(self):
         return "AvpE_InvalidAvpCode"
+    
+class AvpE_DecodAvpError(AvpException):
+    '''解析数据错误'''
+    def __init__(self, msg=None):
+        AvpException.__init__(self, msg)
+    def __name__(self):
+        return "AvpE_DecodAvpError"
+    

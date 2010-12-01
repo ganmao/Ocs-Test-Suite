@@ -132,7 +132,7 @@ class DCC_CFG(object):
             self.CEA = self.__read_AvpFile(cmd_name)
         else:
             raise DCC_ERR.AvpE_InvalidEtcParam, \
-                    "匹配cmd_code编码错误: (%s, %s, %s)" % (cmd_code, request_flag, cmd_name)
+                    "Match CMD_CODE Error:(code=%s, flag=%s, name=%s)" % (cmd_code, request_flag, cmd_name)
                     
     def __del__(self):
         del self.etc_path
@@ -183,7 +183,7 @@ class DCC_CFG(object):
                     return self.CEA[avp_code]
                 else:
                     raise DCC_ERR.AvpE_InvalidEtcParam, \
-                            "匹配CmdCodeStr编码错误! %s %s" % (cmd_code, avp_code)
+                            "Match CMD_CODE Error: cmd_code=%s, acp_code=%s" % (cmd_code, avp_code)
             else:
                 if cmd_code == DCC_DEF.const.CREDIT_CONTROL_REQUEST:
                     return self.CCR
@@ -211,7 +211,8 @@ class DCC_CFG(object):
                     return self.CEA
                 else:
                     raise DCC_ERR.AvpE_InvalidEtcParam, \
-                            "匹配CmdCodeStr编码错误! %s %s" % (cmd_code, avp_code)
-        except KeyError, e:
+                            "Match CMD_CODE Error: cmd_code=%s, acp_code=%s" % (cmd_code, avp_code)
+        except KeyError:
             raise DCC_ERR.AvpE_InvalidAvpCode, \
-                            "配置文件中%s未找到对应的avp_code:%s" % (cmd_code, avp_code)
+                            "Can Not Find The avp_code(%s) In avpfile(%s) Config File!" % (avp_code, cmd_code)
+                            

@@ -570,16 +570,19 @@ class Test_MSG(unittest.TestCase):
         json_str = self.msg.unpack_json(self.dcc.ascii2bin_hex(self.buf))
         #print "pack_json_str=", self.msg
         #print "json_str=", json_str
+        print self.msg.pmsg(99)
         
         
     def test_pack_json(self):
         '测试pack_json'
         self.msg.pack_json((272, 1), self.json_str, 123)
         #self.msg.pmsg(3)
+        
+        #print self.msg.fmt_hex(self.dcc.bin2ascii_hex(self.msg.dmsg['DCC_BUF']))
 
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.test']
-    unittest.main()
+    #unittest.main()
     
 #    suite = unittest.TestLoader().loadTestsFromTestCase(Test_Dcc)
 #    unittest.TextTestRunner(verbosity=2).run(suite)
@@ -590,6 +593,6 @@ if __name__ == "__main__":
 #    suite = unittest.TestLoader().loadTestsFromTestCase(Test_AVP)
 #    unittest.TextTestRunner(verbosity=2).run(suite)
 #
-#    suite = unittest.TestLoader().loadTestsFromTestCase(Test_MSG)
-#    unittest.TextTestRunner(verbosity=2).run(suite)
+    suite = unittest.TestLoader().loadTestsFromTestCase(Test_MSG)
+    unittest.TextTestRunner(verbosity=2).run(suite)
     
