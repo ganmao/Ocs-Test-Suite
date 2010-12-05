@@ -127,14 +127,11 @@ class Test_Config(unittest.TestCase):
         '测试函数:get_config'
         self.assertEqual(
             self.dcc.dcc_cfg.get_config(
-                self.dcc.dcc_def.const.CREDIT_CONTROL_REQUEST,
-                '1')[2],
+                self.dcc.dcc_def.const.CREDIT_CONTROL_REQUEST,'1')[2],
             '1')
         
         self.assertEqual(
-            self.dcc.dcc_cfg.get_config(
-                self.dcc.dcc_def.const.CREDIT_CONTROL_REQUEST
-                )['1'][2], 
+            self.dcc.dcc_cfg.get_config(self.dcc.dcc_def.const.CREDIT_CONTROL_REQUEST)['1'][2], 
             '1')
         
 class Test_AVP(unittest.TestCase):
@@ -335,7 +332,7 @@ class Test_AVP(unittest.TestCase):
         
         #pprint.pprint(self.avp.avp)
         #self.avp.pavp()
-        self.assertEqual(self.avp.avp['AVP_DATA'], [{'447': 200}, {'429': 300}])
+        self.assertEqual(self.avp.avp['AVP_DATA'], [{447: 200}, {429: 300}])
         
     def _test_avp_Float32(self):
         '测试Float32类型 '
@@ -554,14 +551,14 @@ class Test_MSG(unittest.TestCase):
     def test_pack(self):
         '测试DCC消息编码'
         self.msg.pack((272, 1), self.avp_list, 123)
-        #self.msg.pmsg()
+        #self.msg.pmsg(5)
         #print "pack_json_str=", self.msg
         #print "pack_buf_hex=", self.dcc.bin2ascii_hex(self.msg.dmsg['DCC_BUF'])
         
     def test_unpack(self):
         '测试DCC消息解码'
         self.msg.unpack(self.dcc.ascii2bin_hex(self.buf))
-        #self.msg.pmsg(3)
+        #self.msg.pmsg(5)
         
         #print "pack_json_str=", self.msg
         
@@ -570,7 +567,7 @@ class Test_MSG(unittest.TestCase):
         json_str = self.msg.unpack_json(self.dcc.ascii2bin_hex(self.buf))
         #print "pack_json_str=", self.msg
         #print "json_str=", json_str
-        print self.msg.pmsg(99)
+        #print self.msg.pmsg(99)
         
         
     def test_pack_json(self):

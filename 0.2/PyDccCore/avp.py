@@ -75,7 +75,7 @@ class AVP(object):
         self.my_cmd_code = cmd_code
         
         self.avp = {}
-        self.avp['AVP_CODE']          = avp_code
+        self.avp['AVP_CODE']          = int(avp_code)
         self.avp['AVP_FLAG']          = 0x00
         self.avp['AVP_LENGTH']        = 0x00
         self.avp['AVP_DATA']          = avp_data
@@ -97,6 +97,7 @@ class AVP(object):
         
         # 根据传入的 AVP_CODE 获取相应的配置信息
         self.my_avp_cfg = self.__get_avp_config()
+        self.avp['AVP_NAME'] = self.my_avp_cfg[0]
         
     def __del__(self):
         del self.avp
@@ -107,7 +108,7 @@ class AVP(object):
     def __repr__(self):
         if (self.avp['AVP_CODE_STATE'] in (self.dcc.dcc_def.const.ENCODE_DCC_AVP_END,
                                            self.dcc.dcc_def.const.DECODE_DCC_AVP_END)):
-            return repr({self.avp['AVP_CODE']:self.avp['AVP_DATA']})
+            return repr({repr(self.avp['AVP_CODE']):self.avp['AVP_DATA']})
         else:
             raise self.dcc.dcc_err.AvpE_InvalidCodeState, \
                     "The Incorrect Status[%s], Can Not Use repr!" % self.avp['AVP_CODE_STATE']
@@ -231,7 +232,7 @@ class AVP(object):
         self.avp['AVP_CODE_STATE'] = self.dcc.dcc_def.const.ENCODE_DCC_AVP_BODY_BEGIN
         
         # 编码AVP_CODE
-        avp_head_buf = self.dcc.pack_data2bin("!I", int(self.avp['AVP_CODE']))
+        avp_head_buf = self.dcc.pack_data2bin("!I", self.avp['AVP_CODE'])
         
         # 设置vandor_id 值与vandor_id标志
         self.__set_avp_vonder_id()
@@ -388,11 +389,11 @@ class AVP(object):
             
             avp_flag_bin = self.dcc.bin(self.avp['AVP_FLAG'])
             
-            if level == 99:
+            if level == 0:
                 avp_txt = ""
                 tab_space = "\t" * (int(self.my_avp_cfg[1]) - 1)
-                if self.avp['AVP_DATA_TYPE'] == 'Grouped':
-                    self.avp['AVP_DATA'] = self.avp['AVP_DATA_TYPE']
+#                if self.avp['AVP_DATA_TYPE'] == 'Grouped':
+#                    self.avp['AVP_DATA'] = self.avp['AVP_DATA_TYPE']
                 avp_txt = '%s%s(%s)=[%s]\n' % (tab_space,
                                        self.my_avp_cfg[0],
                                        self.avp['AVP_CODE'],
@@ -413,9 +414,9 @@ AVP_VENDOR_ID = 0x%08X(%d)
 AVP_DATA      = %s
 AVP_BUF       = %s
 AVP_BUF_BIN   = 0x%s
-----------------------''' % (int(self.avp['AVP_CODE']),
+----------------------''' % (self.avp['AVP_CODE'],
             self.my_avp_cfg[0],
-            int(self.avp['AVP_CODE']),
+            self.avp['AVP_CODE'],
             self.avp['AVP_FLAG'],
             avp_flag_bin,
             self.avp['AVP_LENGTH'],

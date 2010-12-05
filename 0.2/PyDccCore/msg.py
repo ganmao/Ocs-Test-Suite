@@ -339,6 +339,10 @@ class MSG(object):
         # 解析包头
         offset = self.__unpack_head(self.dmsg['DCC_BUF'])
         
+        # 根据 cmd_code 获取 DCC_NAME
+        _cmd_code = (int(self.dmsg['DCC_CODE']), int(self.dmsg['DCC_REQUEST']))
+        self.dmsg['DCC_NAME'] = self.dcc.dcc_cfg.Code2Cmd[_cmd_code][2]
+        
         self.dmsg['DCC_STAT'] = self.dcc.dcc_def.const.DECODE_DCC_MSG_BODY_BEGIN
         while offset != self.dmsg['DCC_LENGTH']:
             # 确定具体需要解包的AVP BUF
@@ -346,7 +350,7 @@ class MSG(object):
             
             try:
                 # 返回需要解析AVP的AVP_INSTANCE
-                avp_instance = create_avp(cmd_code = (int(self.dmsg['DCC_CODE']), int(self.dmsg['DCC_REQUEST'])),
+                avp_instance = create_avp(cmd_code = _cmd_code,
                                         avp_code = None,
                                         avp_data = None,
                                         decode_buf = avp_pack_buf,
@@ -376,7 +380,7 @@ class MSG(object):
         '''按照格式打印消息包的信息'''
         if self.dmsg['DCC_STAT'] in (self.dcc.dcc_def.const.ENCODE_DCC_MSG_END,
                                      self.dcc.dcc_def.const.DECODE_DCC_MSG_END):
-            if level == 99:
+            if level == 0:
                 msg_txt = ""
                 bin_flags = self.dcc.bin(self.dmsg['DCC_FLAGS'])
                 
@@ -431,95 +435,3 @@ class MSG(object):
             
         return out_str
     
-def create_avp_factory(avp_etc, encode_data=None, decode_buf=None, msg_etc=None):
-    '''根据传入的avp类型配置列表，返回对应AVP数据类型的实例
-    avp_etc        单条Avp的配置list
-    encode_data    需要编码的avp_code
-    decode_buf    需要解码的buf
-    msg_etc        解码时Greouped类型需要用到全部的配置实例
-    '''
-    # TODO: 添加新的数据类型需修改
-    if avp_etc[4] == "Integer32":
-        my_avp = Integer32(avp_etc[2],
-                           avp_data=encode_data,
-                           decode_buf=decode_buf,
-                           level=(int(avp_etc[1])-1),
-                           cmd_etc_instance=avp_etc)
-    elif avp_etc[4] == "Integer64":
-        my_avp = Integer64(avp_etc[2],
-                           avp_data=encode_data,
-                           decode_buf=decode_buf,
-                           level=(int(avp_etc[1])-1),
-                           cmd_etc_instance=avp_etc)
-    elif avp_etc[4] == "Unsigned32":
-        my_avp = Unsigned32(avp_etc[2],
-                           avp_data=encode_data,
-                           decode_buf=decode_buf,
-                           level=(int(avp_etc[1])-1),
-                           cmd_etc_instance=avp_etc)
-    elif avp_etc[4] == "Unsigned64":
-        my_avp = Unsigned64(avp_etc[2],
-                           avp_data=encode_data,
-                           decode_buf=decode_buf,
-                           level=(int(avp_etc[1])-1),
-                           cmd_etc_instance=avp_etc)
-    elif avp_etc[4] == "OctetString":
-        my_avp = OctetString(avp_etc[2],
-                           avp_data=encode_data,
-                           decode_buf=decode_buf,
-                           level=(int(avp_etc[1])-1),
-                           cmd_etc_instance=avp_etc)
-    elif avp_etc[4] == "Float32":
-        my_avp = Float32(avp_etc[2],
-                           avp_data=encode_data,
-                           decode_buf=decode_buf,
-                           level=(int(avp_etc[1])-1),
-                           cmd_etc_instance=avp_etc)
-    elif avp_etc[4] == "Float64":
-        my_avp = Float64(avp_etc[2],
-                           avp_data=encode_data,
-                           decode_buf=decode_buf,
-                           level=(int(avp_etc[1])-1),
-                           cmd_etc_instance=avp_etc)
-    elif avp_etc[4] == "Grouped":
-        my_avp = Grouped(avp_etc[2],
-                            avp_data=encode_data,
-                            decode_buf=decode_buf,
-                            level=(int(avp_etc[1])-1),
-                            cmd_etc_instance=msg_etc)
-    elif avp_etc[4] == "Address":
-        my_avp = Address(avp_etc[2],
-                            avp_data=encode_data,
-                            decode_buf=decode_buf,
-                            level=(int(avp_etc[1])-1),
-                            cmd_etc_instance=avp_etc)
-    elif avp_etc[4] == "Time":
-        my_avp = Time(avp_etc[2],
-                            avp_data=encode_data,
-                            decode_buf=decode_buf,
-                            level=(int(avp_etc[1])-1),
-                            cmd_etc_instance=avp_etc)
-    elif avp_etc[4] == "UTF8String":
-        my_avp = UTF8String(avp_etc[2],
-                            avp_data=encode_data,
-                            decode_buf=decode_buf,
-                            level=(int(avp_etc[1])-1),
-                            cmd_etc_instance=avp_etc)
-    elif avp_etc[4] == "DiameterIdentity":
-        my_avp = DiameterIdentity(avp_etc[2],
-                            avp_data=encode_data,
-                            decode_buf=decode_buf,
-                            level=(int(avp_etc[1])-1),
-                            cmd_etc_instance=avp_etc)
-    elif avp_etc[4] == "Enumerated":
-        my_avp = Enumerated(avp_etc[2],
-                            avp_data=encode_data,
-                            decode_buf=decode_buf,
-                            level=(int(avp_etc[1])-1),
-                            cmd_etc_instance=avp_etc)
-    else:
-        raise D_ERROR.AvpE_InvalidAvpDataType, \
-              "Unknown AVP Data Type:[%s]" % avp_etc[4]
-              
-    return my_avp
-

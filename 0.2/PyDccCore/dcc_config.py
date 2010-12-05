@@ -157,6 +157,8 @@ class DCC_CFG(object):
         '''
         try:
             if avp_code:
+                avp_code = str(avp_code)
+                
                 if cmd_code == DCC_DEF.const.CREDIT_CONTROL_REQUEST:
                     return self.CCR[avp_code]
                 elif cmd_code == DCC_DEF.const.CREDIT_CONTROL_ANSWER:
