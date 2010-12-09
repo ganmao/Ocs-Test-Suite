@@ -73,7 +73,7 @@ class Grouped(AVP):
                                                   self.dcc)
             avp_instance.decode()
             self.avp['SUB_AVP'].append(avp_instance)
-            self.avp['AVP_DATA'].append({avp_instance.avp['AVP_CODE']:avp_instance.avp['AVP_DATA']})
+            self.avp['AVP_DATA'].append(repr({repr(avp_instance.avp['AVP_CODE']):avp_instance.avp['AVP_DATA']}))
             
             # avp['AVP_LENGTH'] 因为是标明的长度，但是dcc要求是4的倍数，所以在这里进行修正
             lengthset = (avp_instance.avp['AVP_LENGTH'] + 3) // 4 * 4

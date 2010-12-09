@@ -179,11 +179,11 @@ class AVP(object):
         self.avp['AVP_CODE_STATE'] = self.dcc.dcc_def.const.ENCODE_DCC_MSG_BODY_BEGIN
         
         # 进行数据编码
-        if self.avp['SUB_AVP']: # 如果存在子AVP,Grouped类型
-            for sub_avp in (self.avp['SUB_AVP']):
-                sub_avp.__encode_data()
-        else:
+        try:
             self.avp['AVP_BUF'] = self.__encode_data()
+        except Exception, e:
+            raise self.dcc.dcc_err.AvpE_DecodAvpError, \
+                    "encode [%d] error!\n%s" % (self.avp['AVP_CODE'], e)
         
         self.avp['AVP_CODE_STATE'] = self.dcc.dcc_def.const.ENCODE_DCC_MSG_BODY_END
         
@@ -280,7 +280,12 @@ class AVP(object):
         self.__set_avp_operator_type()
         
         # 对数据进行解码
-        self.__decode_data(offset_)
+        try:
+            self.__decode_data(offset_)
+        except Exception, e:
+            raise self.dcc.dcc_err.AvpE_DecodAvpError, \
+                    "decode [%d] error!\n%s" % (self.avp['AVP_CODE'], e)
+                
         
         self.avp['AVP_CODE_STATE'] = self.dcc.dcc_def.const.DECODE_DCC_AVP_END
         

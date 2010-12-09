@@ -20,6 +20,8 @@ from avp_utf8string import UTF8String
 from avp_diameteridentity import DiameterIdentity
 from avp_enumerated import Enumerated
 
+import dcc_error
+
 def create_avp(  cmd_code     = (),
                  avp_code     = 0x00,
                  avp_data     = "",
@@ -117,6 +119,9 @@ def create_avp(  cmd_code     = (),
                          avp_data,
                          decode_buf,
                          dcc_instance)
+    else:
+        raise dcc_error.AvpE_InvalidAvpDataType, \
+                "unknown avp data type: %s" % __my_avp_cfg[4]
     
 def decode_avp_code(avp_buf, dcc_instance):
     '''从AVP_BUF中解析出来头部的AVP_CODE

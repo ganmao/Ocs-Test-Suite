@@ -371,10 +371,24 @@ class MSG(object):
             
         self.dmsg['DCC_STAT'] = self.dcc.dcc_def.const.DECODE_DCC_MSG_BODY_END
         
-        self.dmsg['DCC_JSON'] = self.dcc.dumps_json(repr(self.dmsg['DCC_AVP_LIST']))
+        # 将AVP组合为需要返回的数据类型，之后装为json
+        self.dmsg['DCC_JSON'] = self.dcc.dumps_json(
+                                    self.__compress_json_obj(self.dmsg['DCC_AVP_LIST'])
+                                    )
 
         self.dmsg['DCC_STAT'] = self.dcc.dcc_def.const.DECODE_DCC_MSG_END
         return self.dmsg
+    
+    def __compress_json_obj(self, avp_instance_list):
+        '将实例列表转为json可以编辑的数据对象'
+        _json_obj = []
+        for avp in avp_instance_list:
+            if avp.avp['AVP_DATA_TYPE'] == 'Grouped':
+                _json_obj.append({repr(avp.avp['AVP_CODE']):self.__compress_json_obj(avp.avp['SUB_AVP'])})
+            else:
+                _json_obj.append({repr(avp.avp['AVP_CODE']):avp.avp['AVP_DATA']})
+                
+        return _json_obj
     
     def pmsg(self, level=1):
         '''按照格式打印消息包的信息'''
