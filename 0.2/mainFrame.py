@@ -446,6 +446,8 @@ class mainFrame(wx.Frame):
             self.create_avp_tree(_message, _avp)
             
     def create_avp_tree(self,parent_tree, avp):
+        _has_err = False
+        
         _avp_tree_root = self.D_treeListCtrl.AppendItem(parent_tree, u"AVP - " + str(avp.avp['AVP_CODE']))
         self.D_treeListCtrl.SetItemText(_avp_tree_root, avp.avp['AVP_NAME'], 1)
         self.D_treeListCtrl.SetItemText(_avp_tree_root, repr(avp.avp['AVP_DATA']), 2)
@@ -458,6 +460,22 @@ class mainFrame(wx.Frame):
         _avp_flags = self.D_treeListCtrl.AppendItem(_avp_tree_root, u"AVP Flags")
         self.D_treeListCtrl.SetItemText(_avp_flags, str(avp.avp['AVP_FLAG']), 1)
         self.D_treeListCtrl.SetItemText(_avp_flags, "0b"+avp_flag_bin, 2)
+        
+        # 对FLAG进行校验，如果不符合则设置背景色为黄色，并且添加具体问题的子节点
+        if avp.avp['AVP_FLAG'] | 0x80 == avp.avp['AVP_FLAG'] and avp.my_avp_cfg[3] == '0':
+            #消息中存在Vendor-ID，但是配置中没有
+            _has_err = True
+            self.D_treeListCtrl.SetItemBackgroundColour(_avp_flags, wx.Colour(255, 255, 128))
+            _avp_flags_v = self.D_treeListCtrl.AppendItem(_avp_flags, u"WARN")
+            self.D_treeListCtrl.SetItemText(_avp_flags_v, u"Vendor-ID WARN", 1)
+            self.D_treeListCtrl.SetItemText(_avp_flags_v, u"解析包中含有Vendor-ID，但是配置中没有", 2)
+        elif avp.avp['AVP_FLAG'] | 0x80 != avp.avp['AVP_FLAG'] and avp.my_avp_cfg[3] != '0':
+            #消息中没有Vendor-ID标志位，但是配置文件中需要
+            _has_err = True
+            self.D_treeListCtrl.SetItemBackgroundColour(_avp_flags, wx.Colour(255, 255, 128))
+            _avp_flags_v = self.D_treeListCtrl.AppendItem(_avp_flags, u"Vendor-ID WARN")
+            self.D_treeListCtrl.SetItemText(_avp_flags_v, u"Vendor-ID WARN", 1)
+            self.D_treeListCtrl.SetItemText(_avp_flags_v, u"解析包中没有Vendor-ID，但是配置中需要", 2)
         
         _avp_length = self.D_treeListCtrl.AppendItem(_avp_tree_root, u"AVP Length")
         self.D_treeListCtrl.SetItemText(_avp_length, str(avp.avp['AVP_LENGTH']), 1)
@@ -475,6 +493,9 @@ class mainFrame(wx.Frame):
             _avp_data = self.D_treeListCtrl.AppendItem(_avp_tree_root, u"AVP Data")
             self.D_treeListCtrl.SetItemText(_avp_data, repr(avp), 1)
             self.D_treeListCtrl.SetItemText(_avp_data, u"%s" % repr(avp.avp['AVP_DATA']), 2)
+        
+        if _has_err == True:
+            self.D_treeListCtrl.SetItemBackgroundColour(_avp_tree_root, wx.Colour(255, 255, 128))
         
     def pack_json(self, msg_code, json_str):
         '编码JSON数据'
