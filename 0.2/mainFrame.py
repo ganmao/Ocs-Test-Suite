@@ -485,6 +485,9 @@ class mainFrame(wx.Frame):
             _avp_vendorid = self.D_treeListCtrl.AppendItem(_avp_tree_root, u"Vendor-ID")
             self.D_treeListCtrl.SetItemText(_avp_vendorid, str(avp.avp['AVP_VENDOR_ID']), 1)
             self.D_treeListCtrl.SetItemText(_avp_vendorid, u"0x%08X" % avp.avp['AVP_VENDOR_ID'], 2)
+            
+        _avp_data_type = self.D_treeListCtrl.AppendItem(_avp_tree_root, u"AVP Data Type")
+        self.D_treeListCtrl.SetItemText(_avp_data_type, avp.avp['AVP_DATA_TYPE'], 1)
         
         if avp.avp['AVP_DATA_TYPE'] == 'Grouped':
             for _sub_avp in avp.avp['SUB_AVP']:
@@ -493,7 +496,7 @@ class mainFrame(wx.Frame):
             _avp_data = self.D_treeListCtrl.AppendItem(_avp_tree_root, u"AVP Data")
             self.D_treeListCtrl.SetItemText(_avp_data, repr(avp), 1)
             self.D_treeListCtrl.SetItemText(_avp_data, u"%s" % repr(avp.avp['AVP_DATA']), 2)
-        
+            
         if _has_err == True:
             self.D_treeListCtrl.SetItemBackgroundColour(_avp_tree_root, wx.Colour(255, 255, 128))
         
@@ -512,7 +515,8 @@ class mainFrame(wx.Frame):
         pack_buf = a2b_hex(pack_buf)
         my_msg.unpack_json(pack_buf)
         self.msg = my_msg
-        return my_msg.pmsg(0)
+        #return my_msg.pmsg(0)
+        return repr(my_msg)
         
     def fmt_hex(self, hex_buf):
         '''将16进制的字符串格式化输出'''

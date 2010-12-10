@@ -121,7 +121,7 @@ def create_avp(  cmd_code     = (),
                          dcc_instance)
     else:
         raise dcc_error.AvpE_InvalidAvpDataType, \
-                "unknown avp data type: %s" % __my_avp_cfg[4]
+                "unknown avp[%s] data type[%s]!" % (__my_avp_cfg[2], __my_avp_cfg[4])
     
 def decode_avp_code(avp_buf, dcc_instance):
     '''从AVP_BUF中解析出来头部的AVP_CODE

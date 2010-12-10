@@ -8,6 +8,7 @@ Created on 2010-11-28
 from distutils.core import setup
 import py2exe
 import glob
+import time
 
 options = {"py2exe":
            {"compressed": True,
@@ -19,8 +20,8 @@ options = {"py2exe":
             }
            }
 
-setup(version = "0.2",
-      description = "Diameter Message Tools",
+setup(version = "0.2 ",
+      description = "Build From: " + time.ctime(),
       name = "Diameter Message Tools",
       author = "zhang.dongliang",
       author_email = "zhang.dongliang@zte.com.cn",
